@@ -1,0 +1,2535 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>DentaLab</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1a6b4a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DentaLab">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root {
+  --bg:#f5f3ef; --bg2:#edeae4; --surface:#fff;
+  --accent:#1a6b4a; --accent2:#2d9b6e; --accent-light:#e4f4ed;
+  --text:#1c1c1c; --muted:#6b6b6b; --border:#d8d4cc;
+  --danger:#c0392b; --warn:#e67e22;
+  --sidebar:220px; --radius:12px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--text);height:100dvh;overflow:hidden;display:flex;flex-direction:column}
+
+/* ── SETUP WIZARD ── */
+#setup{position:fixed;inset:0;background:var(--bg);z-index:1000;overflow-y:auto;padding:20px;display:flex;flex-direction:column;align-items:center}
+.setup-box{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px 24px;max-width:480px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,0.1);margin:auto}
+.setup-logo{font-size:1.6rem;font-weight:800;color:var(--accent);margin-bottom:6px}
+.setup-logo span{color:var(--text)}
+.setup-step{display:none}.setup-step.active{display:block}
+.setup-title{font-size:1.2rem;font-weight:800;margin-bottom:6px}
+.setup-sub{font-size:0.85rem;color:var(--muted);margin-bottom:24px;line-height:1.6}
+.field{margin-bottom:12px}
+.field label{font-size:0.8rem;font-weight:700;display:block;margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;border:1px solid var(--border);border-radius:9px;padding:11px 14px;font-family:'Sora',sans-serif;font-size:0.9rem;background:var(--bg);outline:none;transition:border-color .18s}
+.field input:focus,.field select:focus{border-color:var(--accent)}
+.field input.error,.field select.error{border-color:var(--danger)!important;background:#fff8f8}
+.field-error{color:var(--danger);font-size:.75rem;margin-top:3px;display:none}
+.field-error.show{display:block}
+.setup-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;position:sticky;bottom:0;background:var(--surface);padding:12px 0 4px;border-top:1px solid var(--border)}
+.btn{border:none;border-radius:9px;padding:11px 24px;font-family:'Sora',sans-serif;font-size:0.9rem;font-weight:700;cursor:pointer;transition:all .18s}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent2)}
+.btn-ghost{background:var(--bg2);color:var(--text)}.btn-ghost:hover{background:var(--border)}
+.btn-danger{background:var(--danger);color:#fff}
+.step-dots{display:flex;gap:6px;margin-bottom:20px}
+.dot-s{width:8px;height:8px;border-radius:50%;background:var(--border)}
+.dot-s.active{background:var(--accent)}
+
+/* ── LAYOUT ── */
+#app{display:none;flex:1;overflow:hidden;flex-direction:row}
+#app.visible{display:flex}
+
+/* ── SIDEBAR ── */
+.sidebar{width:var(--sidebar);background:var(--text);display:flex;flex-direction:column;flex-shrink:0;height:100dvh}
+.sidebar-logo{padding:20px 18px 16px;font-size:1.25rem;font-weight:800;color:var(--accent2);border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:8px}
+.sidebar-logo span{color:#fff}
+.sidebar-nav{flex:1;padding:12px 10px;display:flex;flex-direction:column;gap:3px;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;font-size:.87rem;font-weight:500;color:rgba(255,255,255,.55);cursor:pointer;transition:all .18s;border:none;background:none;text-align:left;width:100%}
+.nav-item:hover{background:rgba(255,255,255,.07);color:#fff}
+.nav-item.active{background:var(--accent);color:#fff}
+.nav-item .icon{font-size:.95rem;width:20px;text-align:center;flex-shrink:0}
+.sidebar-footer{padding:12px 10px;border-top:1px solid rgba(255,255,255,.08)}
+
+/* ── MAIN ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.topbar-title{font-size:1rem;font-weight:700}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.api-pill{font-size:.72rem;font-weight:700;padding:4px 12px;border-radius:100px;display:flex;align-items:center;gap:5px}
+.api-pill.ok{background:var(--accent-light);color:var(--accent)}
+.api-pill.err{background:#fdecea;color:var(--danger)}
+.led{width:6px;height:6px;border-radius:50%}
+.led.g{background:var(--accent)}.led.r{background:var(--danger)}
+
+/* ── PAGES ── */
+.page{display:none;flex:1;overflow-y:auto;padding:24px}
+.page.active{display:block}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:gap}
+.page-title{font-size:1.1rem;font-weight:800}
+
+/* ── CARDS & TABLES ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px}
+.kpi-label{font-size:.72rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.kpi-val{font-size:1.8rem;font-weight:800;color:var(--accent);letter-spacing:-.03em;margin:4px 0 2px}
+.kpi-sub{font-size:.72rem;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:16px}
+.card-title{font-size:.88rem;font-weight:700;padding:14px 16px;border-bottom:1px solid var(--border);background:var(--bg2)}
+table{width:100%;border-collapse:collapse}
+th{background:var(--bg2);font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;text-align:left;color:var(--muted)}
+td{padding:11px 14px;font-size:.87rem;border-top:1px solid var(--border)}
+tr:hover td{background:rgba(26,107,74,.03)}
+.badge{display:inline-block;padding:3px 10px;border-radius:100px;font-size:.7rem;font-weight:700}
+.badge.verde{background:#e4f4ed;color:var(--accent)}
+.badge.giallo{background:#fff8e1;color:var(--warn)}
+.badge.rosso{background:#fdecea;color:var(--danger)}
+.badge.grigio{background:var(--bg2);color:var(--muted)}
+.action-btn{border:none;background:none;cursor:pointer;font-size:.85rem;padding:4px 8px;border-radius:6px;transition:background .15s}
+.action-btn:hover{background:var(--bg2)}
+
+/* ── MAGAZZINO ── */
+.mag-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.mag-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.mag-name{font-weight:700;font-size:.9rem;margin-bottom:3px}
+.mag-qty{font-size:1.5rem;font-weight:800;color:var(--accent)}
+.mag-unit{font-size:.75rem;color:var(--muted)}
+.mag-bar{height:4px;background:var(--bg2);border-radius:3px;margin-top:10px;overflow:hidden}
+.mag-fill{height:100%;border-radius:3px;background:var(--accent);transition:width .4s}
+.mag-fill.low{background:var(--warn)}.mag-fill.critical{background:var(--danger)}
+
+/* ── AGENDA ── */
+.week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:16px}
+.day-col{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;min-height:140px}
+.day-col.today{border-color:var(--accent)}
+.day-label{font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
+.day-col.today .day-label{color:var(--accent)}
+.appt{background:var(--accent-light);border-left:3px solid var(--accent);border-radius:5px;padding:5px 7px;font-size:.72rem;font-weight:600;margin-bottom:5px;color:var(--accent);cursor:pointer}
+.appt.urgente{background:#fdecea;border-color:var(--danger);color:var(--danger)}
+.appt.corso{background:#fff8e1;border-color:var(--warn);color:var(--warn)}
+
+/* ── DICHIARAZIONI ── */
+.dich-form{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:600px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.check-group{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
+.check-item{display:flex;align-items:center;gap:7px;font-size:.87rem;cursor:pointer}
+.check-item input{accent-color:var(--accent);width:15px;height:15px}
+.pdf-preview{margin-top:16px;padding:16px;background:var(--bg2);border-radius:9px;font-size:.82rem;color:var(--muted)}
+
+/* ── CHAT ── */
+.chat-wrap{max-width:680px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;height:calc(100dvh - 104px)}
+.chat-head{background:var(--accent);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.chat-av{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:1rem}
+.chat-msgs{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px}
+.chat-msgs::-webkit-scrollbar{width:3px}
+.chat-msgs::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.msg{display:flex;gap:8px;max-width:80%}
+.msg.user{align-self:flex-end;flex-direction:row-reverse}
+.msg-av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;flex-shrink:0;background:var(--accent-light);color:var(--accent)}
+.msg.user .msg-av{background:var(--accent);color:#fff}
+.msg-bub{padding:9px 13px;border-radius:12px;font-size:.87rem;line-height:1.6;background:var(--bg);border:1px solid var(--border)}
+.msg.user .msg-bub{background:var(--accent);color:#fff;border-color:var(--accent)}
+.msg-t{font-size:.65rem;color:var(--muted);margin-top:3px}
+.msg.user .msg-t{text-align:right}
+.typing{display:none;align-self:flex-start;gap:8px;align-items:center}
+.typing.show{display:flex}
+.typing-dots{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:9px 13px;display:flex;gap:4px;align-items:center}
+.typing-dots span{width:6px;height:6px;background:var(--accent);border-radius:50%;opacity:.4;animation:blink 1.2s infinite}
+.typing-dots span:nth-child(2){animation-delay:.2s}
+.typing-dots span:nth-child(3){animation-delay:.4s}
+.chat-suggs{display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px;border-top:1px solid var(--border);flex-shrink:0}
+.sugg{font-family:'Sora',sans-serif;font-size:.74rem;font-weight:500;background:var(--bg);border:1px solid var(--border);color:var(--muted);padding:5px 11px;border-radius:100px;cursor:pointer;transition:all .15s}
+.sugg:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-light)}
+.chat-inp-row{border-top:1px solid var(--border);padding:12px 14px;display:flex;gap:8px;align-items:flex-end;flex-shrink:0}
+.chat-inp{flex:1;resize:none;border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-family:'Sora',sans-serif;font-size:.87rem;background:var(--bg);outline:none;transition:border-color .18s;max-height:90px;line-height:1.5}
+.chat-inp:focus{border-color:var(--accent)}
+.send-btn{width:38px;height:38px;border-radius:9px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-size:.9rem;transition:background .18s;flex-shrink:0}
+.send-btn:hover{background:var(--accent2)}
+.send-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── MODAL ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:16px;padding:28px;width:100%;max-width:520px;max-height:90dvh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.15)}
+.modal h2{font-size:1rem;font-weight:800;margin-bottom:18px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+
+/* ── SETTINGS ── */
+.settings-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+.settings-section h3{font-size:.9rem;font-weight:700;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+
+/* ── MOBILE ── */
+.mob-bar{display:none;background:var(--text);padding:10px;justify-content:space-around;border-top:1px solid rgba(255,255,255,.1)}
+.mob-item{display:flex;flex-direction:column;align-items:center;gap:3px;color:rgba(255,255,255,.5);font-size:.62rem;font-weight:600;cursor:pointer;padding:6px 12px;border-radius:8px;transition:all .15s;border:none;background:none}
+.mob-item.active,.mob-item:hover{color:#fff}
+.mob-item .icon{font-size:1.1rem}
+
+@media(max-width:768px){
+  .sidebar{display:none}
+  .mob-bar{display:flex}
+  #app{flex-direction:column}
+  .main{flex:1;min-height:0}
+  .page{padding:16px}
+  .form-row{grid-template-columns:1fr}
+  .week-grid{grid-template-columns:repeat(3,1fr)}
+  .topbar{padding:0 16px}
+  .chat-wrap{height:calc(100dvh - 160px)}
+}
+
+/* ── QUICK ADD FAB ── */
+.fab{position:fixed;bottom:80px;right:20px;z-index:300;display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+.fab-main{width:52px;height:52px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:1.4rem;cursor:pointer;box-shadow:0 4px 20px rgba(26,107,74,.35);transition:all .2s;display:flex;align-items:center;justify-content:center}
+.fab-main:hover{background:var(--accent2);transform:scale(1.05)}
+.fab-main.open{transform:rotate(45deg)}
+.fab-menu{display:none;flex-direction:column;gap:8px;align-items:flex-end}
+.fab-menu.open{display:flex}
+.fab-item{display:flex;align-items:center;gap:10px;cursor:pointer;animation:fadeUp .2s ease both}
+.fab-item-btn{width:42px;height:42px;border-radius:50%;border:none;font-size:1.1rem;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.15);transition:all .18s;background:var(--surface)}
+.fab-item-btn:hover{transform:scale(1.08)}
+.fab-label{background:var(--text);color:#fff;padding:4px 10px;border-radius:6px;font-size:.75rem;font-weight:600;white-space:nowrap}
+
+/* ── VOICE MODAL ── */
+.voice-circle{width:80px;height:80px;border-radius:50%;background:var(--accent);margin:20px auto;display:flex;align-items:center;justify-content:center;font-size:2rem;cursor:pointer;transition:all .2s;box-shadow:0 4px 20px rgba(26,107,74,.3)}
+.voice-circle.listening{animation:pulse 1s infinite;background:var(--danger)}
+.voice-transcript{min-height:60px;background:var(--bg2);border-radius:10px;padding:14px;font-size:.9rem;color:var(--text);margin:14px 0;line-height:1.6;text-align:center}
+.voice-result{background:var(--accent-light);border:1px solid #b2dfc8;border-radius:10px;padding:14px;margin-top:10px;font-size:.85rem;display:none}
+.voice-result.show{display:block}
+
+/* ── PHOTO MODAL ── */
+.photo-drop{border:2px dashed var(--border);border-radius:12px;padding:32px 20px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:14px}
+.photo-drop:hover,.photo-drop.drag{border-color:var(--accent);background:var(--accent-light)}
+.photo-drop img{max-width:100%;max-height:200px;border-radius:8px;margin-top:10px}
+.photo-analyzing{display:none;text-align:center;padding:20px}
+.photo-analyzing.show{display:block}
+
+/* ── TEMPLATES ── */
+.tpl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:14px}
+.tpl-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all .18s;position:relative}
+.tpl-card:hover{border-color:var(--accent);background:var(--accent-light)}
+.tpl-name{font-weight:700;font-size:.88rem;margin-bottom:4px}
+.tpl-detail{font-size:.75rem;color:var(--muted)}
+.tpl-del{position:absolute;top:8px;right:8px;background:none;border:none;cursor:pointer;font-size:.85rem;opacity:.5}
+.tpl-del:hover{opacity:1}
+
+/* ── IMPORT ── */
+.import-drop{border:2px dashed var(--border);border-radius:12px;padding:32px 20px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:14px}
+.import-drop:hover{border-color:var(--accent);background:var(--accent-light)}
+.import-preview{max-height:200px;overflow-y:auto;font-size:.78rem}
+.import-preview table{width:100%}
+.import-preview th,.import-preview td{padding:4px 8px;border:1px solid var(--border);text-align:left}
+
+@keyframes blink{0%,100%{opacity:.4;transform:scale(1)}50%{opacity:1;transform:scale(1.2)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(192,57,43,.4)}50%{box-shadow:0 0 0 16px rgba(192,57,43,0)}}
+/* ── UPDATE BANNER ── */
+#update-banner{display:none;position:fixed;top:0;left:0;right:0;z-index:999;background:var(--accent);color:#fff;padding:12px 20px;text-align:center;font-size:.88rem;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.2);align-items:center;justify-content:center;gap:14px}
+#update-banner.show{display:flex}
+#update-banner button{background:rgba(255,255,255,.25);border:none;color:#fff;padding:6px 16px;border-radius:7px;font-family:'Sora',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;transition:background .18s}
+#update-banner button:hover{background:rgba(255,255,255,.4)}
+</style>
+</head>
+<body>
+
+<!-- ══ UPDATE BANNER ══ -->
+<div id="update-banner">
+  🔄 Nuova versione disponibile!
+  <button onclick="applyUpdate()">Aggiorna ora</button>
+  <button onclick="document.getElementById('update-banner').classList.remove('show')" style="background:rgba(255,255,255,.1)">Dopo</button>
+</div>
+
+<!-- ══ SETUP WIZARD ══ -->
+<div id="setup">
+  <div class="setup-box">
+    <div class="setup-logo">🦷 Denta<span>Lab</span></div>
+
+    <!-- PAGE 0: Login o nuovo setup -->
+    <div id="setup-page-0">
+      <div class="setup-title">Benvenuto!</div>
+      <div class="setup-sub">Accedi con il tuo PIN oppure configura un nuovo account.</div>
+      <div class="field"><label>Il tuo PIN (4 cifre)</label>
+        <input id="s-pin-login" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="font-size:1.5rem;letter-spacing:8px;text-align:center">
+      </div>
+      <div id="s-pin-error" style="color:var(--danger);font-size:.82rem;margin-top:-8px;margin-bottom:8px;display:none">PIN errato. Riprova.</div>
+      <div style="margin-top:16px;display:flex;gap:10px;flex-direction:column">
+        <button class="btn btn-primary" style="width:100%;font-size:1rem;padding:14px" onclick="loginWithPin()">🔓 Accedi con PIN</button>
+        <div style="text-align:center;font-size:.8rem;color:var(--muted)">— oppure —</div>
+        <button class="btn btn-ghost" style="width:100%" onclick="showNewSetup()">➕ Primo accesso / Nuovo dispositivo</button>
+        <button class="btn btn-ghost" style="width:100%" onclick="showRecoverPage()">📂 Recupera backup da file</button>
+      </div>
+    </div>
+
+    <!-- PAGE 1: Nuovo setup -->
+    <div id="setup-page-1" style="display:none">
+      <div class="setup-title">Il tuo laboratorio</div>
+      <div class="setup-sub">Inserisci i dati base. Puoi completare il resto nelle Impostazioni.</div>
+      <div class="field"><label>Nome Laboratorio *</label><input id="s-labname" placeholder="es. Lab Odontotecnico Rossi"></div>
+      <div class="field"><label>Nome Odontotecnico *</label><input id="s-tecnico" placeholder="es. Mario Rossi"></div>
+      <div class="field"><label>Indirizzo</label><input id="s-indirizzo" placeholder="Via Roma 1, Venezia"></div>
+      <div class="field"><label>Telefono</label><input id="s-tel" placeholder="0421 123456"></div>
+      <div class="field"><label>Scegli un PIN (4 cifre) *</label>
+        <input id="s-pin" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="font-size:1.5rem;letter-spacing:8px;text-align:center">
+        <div style="font-size:.75rem;color:var(--muted);margin-top:4px">Il PIN serve per accedere all'app su questo e altri dispositivi</div>
+      </div>
+      <div style="margin-top:20px;display:flex;gap:10px;justify-content:space-between">
+        <button class="btn btn-ghost" onclick="showLoginPage()">← Indietro</button>
+        <button class="btn btn-primary" style="min-width:140px;font-size:1rem;padding:14px 28px" onclick="gotoPage2()">Avanti →</button>
+      </div>
+    </div>
+
+    <!-- PAGE 2: API Key -->
+    <div id="setup-page-2" style="display:none">
+      <div class="setup-title">API Key Anthropic</div>
+      <div class="setup-sub">Serve per la chat AI. Ottienila su <a href="https://console.anthropic.com/api-keys" target="_blank" style="color:var(--accent)">console.anthropic.com</a> — puoi saltare e aggiungerla dopo.</div>
+      <div class="field"><label>API Key</label><input id="s-apikey" type="password" placeholder="sk-ant-api03-..."></div>
+      <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-ghost" onclick="gotoPage3()">Salta</button>
+        <button class="btn btn-primary" style="min-width:120px" onclick="gotoPage3()">Avanti →</button>
+      </div>
+    </div>
+
+    <!-- PAGE 3: Materiali -->
+    <div id="setup-page-3" style="display:none">
+      <div class="setup-title">Sei pronto! 🚀</div>
+      <div class="setup-sub">Aggiungi subito i materiali del tuo magazzino, oppure fallo dopo.</div>
+      <div id="setup-mat-list" style="margin-bottom:12px"></div>
+      <button class="btn btn-ghost" style="width:100%;margin-bottom:20px" onclick="addSetupMat()">+ Aggiungi materiale</button>
+      <div style="text-align:center">
+        <button class="btn btn-primary" style="min-width:200px;font-size:1rem;padding:14px 28px" onclick="setupFinish()">Inizia a usare DentaLab 🚀</button>
+      </div>
+    </div>
+
+    <!-- PAGE RECOVER: Recupera da backup -->
+    <div id="setup-page-recover" style="display:none">
+      <div class="setup-title">📂 Recupera backup</div>
+      <div class="setup-sub">Carica il file di backup <strong>dentalab_backup.json</strong> salvato in precedenza su iCloud, OneDrive o nella tua galleria.</div>
+      <div class="photo-drop" style="margin-bottom:16px" onclick="document.getElementById('backup-file-input').click()">
+        📂 Tocca per selezionare il file backup<br>
+        <span style="font-size:.75rem;color:var(--muted)">dentalab_backup.json</span>
+      </div>
+      <input type="file" id="backup-file-input" accept=".json" style="display:none" onchange="loadBackupFile(event)">
+      <div id="backup-pin-wrap" style="display:none">
+        <div class="field"><label>Inserisci il tuo PIN per confermare</label>
+          <input id="s-pin-recover" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="font-size:1.5rem;letter-spacing:8px;text-align:center">
+        </div>
+        <div id="s-pin-recover-error" style="color:var(--danger);font-size:.82rem;display:none">PIN errato.</div>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:10px;justify-content:space-between">
+        <button class="btn btn-ghost" onclick="showLoginPage()">← Indietro</button>
+        <button class="btn btn-primary" id="backup-confirm-btn" style="display:none" onclick="confirmRecover()">✅ Recupera dati</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ APP ══ -->
+<div id="app">
+  <!-- Sidebar desktop -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">🦷 Denta<span>Lab</span></div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-page="dashboard"><span class="icon">🏠</span> Dashboard</button>
+      <button class="nav-item" data-page="lavori"><span class="icon">🦷</span> Lavori</button>
+      <button class="nav-item" data-page="agenda"><span class="icon">📅</span> Agenda</button>
+      <button class="nav-item" data-page="magazzino"><span class="icon">📦</span> Magazzino</button>
+      <button class="nav-item" data-page="dichiarazioni"><span class="icon">📄</span> Dichiarazioni</button>
+      <button class="nav-item" data-page="fatture"><span class="icon">🧾</span> Fatture</button>
+      <button class="nav-item" data-page="chat"><span class="icon">🤖</span> AI Chat</button>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="nav-item" data-page="impostazioni"><span class="icon">⚙️</span> Impostazioni</button>
+      <button class="nav-item" onclick="esportaExcel()" style="color:rgba(255,255,255,.55)"><span class="icon">📥</span> Esporta Excel</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="pageTitle">Dashboard</div>
+      <div class="topbar-right">
+        <div class="api-pill err" id="apiPill"><span class="led r" id="apiLed"></span><span id="apiTxt">API non configurata</span></div>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="kpi-grid" id="kpi-grid"></div>
+      <div class="card">
+        <div class="card-title">Lavori recenti</div>
+        <table><thead><tr><th>Paziente</th><th>Dottore</th><th>Tipo</th><th>Scadenza</th><th>Stato</th></tr></thead>
+        <tbody id="dash-lavori"></tbody></table>
+      </div>
+    </div>
+
+    <!-- LAVORI -->
+    <div class="page" id="page-lavori">
+      <div class="page-header">
+        <div class="page-title">Lavori</div>
+        <button class="btn btn-primary" onclick="openModal('lavoro')">+ Nuovo lavoro</button>
+      </div>
+      <input type="search" id="lavori-search" placeholder="🔍 Cerca per paziente, dottore, tipo..." oninput="renderLavori()" style="width:100%;border:1px solid var(--border);border-radius:9px;padding:10px 14px;font-family:'Sora',sans-serif;font-size:.88rem;background:var(--surface);outline:none;margin-bottom:14px;transition:border-color .18s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+      <div class="card">
+        <table><thead><tr><th>#</th><th>Paziente</th><th>Dottore</th><th>Tipo</th><th>Materiale</th><th>Scadenza</th><th>Stato</th><th></th></tr></thead>
+        <tbody id="lavori-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- AGENDA -->
+    <div class="page" id="page-agenda">
+      <div class="page-header">
+        <div class="page-title">Agenda settimanale</div>
+        <button class="btn btn-ghost" id="gcal-btn" onclick="openGcalSetup()" style="font-size:.82rem">📅 Sincronizza Google Calendar</button>
+      </div>
+      <div class="week-grid" id="week-grid"></div>
+      <div class="card">
+        <div class="card-title">Tutti i lavori in scadenza</div>
+        <table><thead><tr><th>Data</th><th>Paziente</th><th>Tipo</th><th>Stato</th><th></th></tr></thead>
+        <tbody id="agenda-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- MAGAZZINO -->
+    <div class="page" id="page-magazzino">
+      <div class="page-header">
+        <div class="page-title">Magazzino</div>
+        <button class="btn btn-primary" onclick="openModal('materiale')">+ Aggiungi materiale</button>
+      </div>
+      <div class="mag-grid" id="mag-grid"></div>
+    </div>
+
+    <!-- DICHIARAZIONI -->
+    <div class="page" id="page-dichiarazioni">
+      <div class="page-header">
+        <div class="page-title">Dichiarazione di Conformità MDR 2017/745</div>
+      </div>
+
+      <!-- Compilazione rapida -->
+      <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+        <button class="btn btn-primary" style="flex:1;min-width:140px;font-size:.9rem" onclick="openDichVoice()">🎤 Compila con voce</button>
+        <button class="btn btn-primary" style="flex:1;min-width:140px;font-size:.9rem;background:var(--accent2)" onclick="openDichPhoto()">📷 Scansiona prescrizione</button>
+        <button class="btn btn-ghost" style="font-size:.85rem" onclick="precompilaDich()">🔄 Auto-compila lab</button>
+      </div>
+
+      <div class="dich-form">
+
+        <div style="font-size:.82rem;font-weight:700;color:var(--accent);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">N° e DATA</div>
+        <div class="form-row">
+          <div class="field"><label>N° Dichiarazione</label><input id="d-numero" placeholder="es. 001"></div>
+          <div class="field"><label>Anno</label><input id="d-anno" placeholder="2026"></div>
+        </div>
+        <div class="field"><label>Data dichiarazione</label><input id="d-data" type="date"></div>
+
+        <div style="font-size:.82rem;font-weight:700;color:var(--accent);margin:14px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)">DATI PAZIENTE / DESTINATARIO</div>
+        <div class="field"><label>Codice identificativo paziente</label><input id="d-codice" placeholder="es. LAB-2025-001"></div>
+        <div class="form-row">
+          <div class="field"><label>Data di nascita paziente</label><input id="d-nascita" type="date"></div>
+          <div class="field"><label>N° prescrizione</label><input id="d-npres" placeholder="es. RX-001"></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label>Medico prescrittore</label><input id="d-medico" placeholder="Dr. Mario Bianchi"></div>
+          <div class="field"><label>Studio / Clinica</label><input id="d-studio" placeholder="Studio Dentistico Bianchi"></div>
+        </div>
+        <div class="field"><label>Data prescrizione</label><input id="d-datapres" type="date"></div>
+
+        <div style="font-size:.82rem;font-weight:700;color:var(--accent);margin:14px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)">DESCRIZIONE DISPOSITIVO</div>
+        <div class="field">
+          <label>Tipo dispositivo</label>
+          <div class="check-group">
+            <label class="check-item"><input type="checkbox" id="d-fissa"> Protesi fissa</label>
+            <label class="check-item"><input type="checkbox" id="d-mobile"> Protesi mobile / rimovibile</label>
+            <label class="check-item"><input type="checkbox" id="d-orto"> Apparecchio ortodontico</label>
+            <label class="check-item"><input type="checkbox" id="d-3d"> Dispositivo stampato in 3D</label>
+          </div>
+        </div>
+        <div class="field"><label>Denominazione dispositivo</label><input id="d-denom" placeholder="es. Corona in zirconia molare superiore dx"></div>
+        <div class="field"><label>Codice / matricola</label><input id="d-matricola" placeholder="es. C14-2025"></div>
+        <div class="field"><label>Materiali principali</label><input id="d-mat" placeholder="es. Zirconia Y-TZP, ceramica da stratificazione"></div>
+        <div class="field"><label>Fornitore materiali</label><input id="d-fornitore" placeholder="es. Ivoclar, VITA, Dentsply..."></div>
+        <div class="field"><label>Tecnica di fabbricazione</label><input id="d-tecnica" placeholder="es. Fresatura CAD/CAM, stratificazione ceramica"></div>
+
+        <div style="font-size:.82rem;font-weight:700;color:var(--accent);margin:14px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)">ANALISI RISCHI</div>
+        <div class="check-group" style="margin-bottom:8px">
+          <label class="check-item"><input type="checkbox" id="d-rischi" checked> Analisi dei rischi effettuata</label>
+          <label class="check-item"><input type="checkbox" id="d-processo" checked> Controllo processo fabbricazione</label>
+          <label class="check-item"><input type="checkbox" id="d-rintracciabile" checked> Rintracciabilità materiali garantita</label>
+          <label class="check-item"><input type="checkbox" id="d-rischicom" checked> Rischi residui comunicati al medico</label>
+          <label class="check-item"><input type="checkbox" id="d-archivio" checked> Documentazione conservata 10 anni</label>
+        </div>
+
+        <div style="background:var(--bg2);border-radius:10px;padding:14px;margin-bottom:16px">
+          <div style="font-size:.82rem;font-weight:700;margin-bottom:10px;color:var(--text)">⚡ Compila velocemente</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-primary" style="flex:1;min-width:140px" onclick="openVoiceDich()">🎤 Detta la prescrizione</button>
+            <button class="btn btn-primary" style="flex:1;min-width:140px;background:#2563eb" onclick="openPhotoDich()">📷 Foto prescrizione</button>
+          </div>
+          <p style="font-size:.75rem;color:var(--muted);margin-top:8px">Parla o scatta una foto — l'AI compila tutti i campi in automatico</p>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="generaPDF()">📄 Genera PDF</button>
+          <button class="btn btn-ghost" onclick="caricaDaLavoro()">↗ Carica da lavoro</button>
+          <button class="btn btn-ghost" onclick="precompilaDich()">🔄 Auto-compila dati lab</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- FATTURE -->
+    <div class="page" id="page-fatture">
+      <div class="page-header">
+        <div class="page-title">Fatture</div>
+        <button class="btn btn-primary" onclick="openModal('fattura')">+ Nuova fattura</button>
+      </div>
+      <input type="search" id="fatture-search" placeholder="🔍 Cerca per studio o descrizione..." oninput="renderFatture()" style="width:100%;border:1px solid var(--border);border-radius:9px;padding:10px 14px;font-family:'Sora',sans-serif;font-size:.88rem;background:var(--surface);outline:none;margin-bottom:14px;transition:border-color .18s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+      <div class="card">
+        <table><thead><tr><th>N°</th><th>Studio</th><th>Data</th><th>Importo</th><th>Stato</th><th></th></tr></thead>
+        <tbody id="fatture-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- CHAT -->
+    <div class="page" id="page-chat">
+      <div class="chat-wrap">
+        <div class="chat-head">
+          <div class="chat-av">🤖</div>
+          <div><div style="font-weight:700;font-size:.92rem">DentaLab AI — Claude</div>
+          <div style="font-size:.7rem;opacity:.75;display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;background:#6fffb3;border-radius:50%;display:inline-block"></span> Online</div></div>
+        </div>
+        <div class="chat-msgs" id="chat-msgs">
+          <div class="msg ai">
+            <div class="msg-av">AI</div>
+            <div><div class="msg-bub">Ciao! 👋 Sono il tuo assistente AI integrato in DentaLab.<br>Posso aiutarti con MDR, materiali, fatturazione, CAD/CAM e tutto ciò che riguarda il tuo laboratorio. Come posso aiutarti?</div>
+            <div class="msg-t">Adesso</div></div>
+          </div>
+          <div class="typing" id="typing"><div class="msg-av">AI</div><div class="typing-dots"><span></span><span></span><span></span></div></div>
+        </div>
+        <div class="chat-suggs">
+          <button class="sugg" onclick="sendSugg(this)">MDR 2017/745</button>
+          <button class="sugg" onclick="sendSugg(this)">Dichiarazione conformità</button>
+          <button class="sugg" onclick="sendSugg(this)">Materiali per zirconia</button>
+          <button class="sugg" onclick="sendSugg(this)">Stampa 3D dentale</button>
+        </div>
+        <div class="chat-inp-row">
+          <textarea class="chat-inp" id="chat-inp" rows="1" placeholder="Scrivi un messaggio..." onkeydown="chatKey(event)" oninput="autoH(this)"></textarea>
+          <button class="send-btn" id="send-btn" onclick="sendChat()">➤</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- IMPOSTAZIONI -->
+    <div class="page" id="page-impostazioni">
+      <div class="page-title" style="margin-bottom:16px">Impostazioni</div>
+      <div class="settings-section">
+        <h3>🏥 Dati Laboratorio</h3>
+        <div class="form-row">
+          <div class="field"><label>Nome Laboratorio</label><input id="cfg-labname"></div>
+          <div class="field"><label>Odontotecnico</label><input id="cfg-tecnico"></div>
+        </div>
+        <div class="field"><label>Indirizzo sede legale</label><input id="cfg-indirizzo"></div>
+        <div class="form-row">
+          <div class="field"><label>Luogo fabbricazione</label><input id="cfg-luogo"></div>
+          <div class="field"><label>Telefono</label><input id="cfg-tel"></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label>Email</label><input id="cfg-email"></div>
+          <div class="field"><label>P.IVA / C.F.</label><input id="cfg-piva"></div>
+        </div>
+        <div class="field"><label>N° iscrizione Min. Salute</label><input id="cfg-minsalute"></div>
+      </div>
+      <div class="settings-section">
+        <h3>🤖 API Key Anthropic (chat AI)</h3>
+        <div class="field"><label>API Key</label><input id="cfg-apikey" type="password" placeholder="sk-ant-api03-..."></div>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:6px">Ottienila su <a href="https://console.anthropic.com/api-keys" target="_blank" style="color:var(--accent)">console.anthropic.com</a></p>
+      </div>
+      <div class="settings-section">
+        <h3>📅 Google Calendar</h3>
+        <div class="field"><label>ID Calendario (opzionale)</label><input id="cfg-gcal" placeholder="tuoemail@gmail.com"></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
+          <input type="checkbox" id="cfg-gcal-enabled" style="width:18px;height:18px;accent-color:var(--accent)">
+          <label for="cfg-gcal-enabled" style="font-size:.87rem;cursor:pointer">Sincronizzazione automatica attiva</label>
+        </div>
+        <button class="btn btn-ghost" style="margin-top:10px;width:100%" onclick="connectGoogleCalendar()">🔗 Collega Google Calendar</button>
+        <div id="gcal-status" style="font-size:.78rem;margin-top:6px;color:var(--muted)">Non collegato</div>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:6px">Prima collega l'account, poi attiva la sincronizzazione automatica</p>
+      </div>
+      <div class="settings-section">
+        <h3>🔑 PIN e Backup</h3>
+        <div class="field"><label>Cambia PIN (4 cifre)</label>
+          <input id="cfg-pin" type="password" inputmode="numeric" maxlength="4" placeholder="Lascia vuoto per non cambiare" style="letter-spacing:6px;text-align:center">
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+          <button class="btn btn-ghost" style="flex:1" onclick="esportaBackup()">📥 Esporta backup JSON</button>
+        </div>
+        <p style="font-size:.75rem;color:var(--muted);margin-top:8px">Salva il backup su iCloud o OneDrive — usalo per accedere da un nuovo dispositivo</p>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="saveSettings()">Salva impostazioni</button>
+        <button class="btn btn-danger" onclick="resetApp()" style="margin-left:auto">🗑 Reset completo dati</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile navbar -->
+  <div class="mob-bar">
+    <button class="mob-item active" data-page="dashboard"><span class="icon">🏠</span>Home</button>
+    <button class="mob-item" data-page="lavori"><span class="icon">🦷</span>Lavori</button>
+    <button class="mob-item" data-page="agenda"><span class="icon">📅</span>Agenda</button>
+    <button class="mob-item" data-page="dichiarazioni"><span class="icon">📄</span>Dichiar.</button>
+    <button class="mob-item" data-page="chat"><span class="icon">🤖</span>AI</button>
+    <button class="mob-item" data-page="impostazioni"><span class="icon">⚙️</span>Config</button>
+  </div>
+</div>
+
+<!-- ══ MODAL LAVORO ══ -->
+<div class="modal-overlay" id="modal-lavoro">
+  <div class="modal">
+    <h2 id="modal-lavoro-title">Nuovo lavoro</h2>
+    <input type="hidden" id="lav-id">
+    <div class="form-row">
+      <div class="field"><label>Paziente *</label><input id="lav-paziente" placeholder="Cognome Nome"></div>
+      <div class="field"><label>Medico *</label><input id="lav-dottore" placeholder="Dr. Bianchi"></div>
+    </div>
+    <div class="field"><label>Studio / Clinica</label><input id="lav-studio" placeholder="Studio Dentistico..."></div>
+    <div class="form-row">
+      <div class="field"><label>Tipo dispositivo</label>
+        <select id="lav-tipo">
+          <option>Protesi fissa</option><option>Protesi mobile / rimovibile</option>
+          <option>Apparecchio ortodontico</option><option>Dispositivo stampato in 3D</option><option>Altro</option>
+        </select>
+      </div>
+      <div class="field"><label>Stato</label>
+        <select id="lav-stato">
+          <option value="In attesa">In attesa</option><option value="In corso">In corso</option>
+          <option value="Urgente">Urgente</option><option value="Completato">Completato</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Denominazione</label><input id="lav-denom" placeholder="es. Corona zirconia"></div>
+      <div class="field"><label>Materiale</label><input id="lav-materiale" placeholder="es. Zirconia Y-TZP"></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Data prescrizione</label><input id="lav-datapres" type="date"></div>
+      <div class="field"><label>Scadenza *</label><input id="lav-scadenza" type="date"></div>
+    </div>
+    <div class="field"><label>Note</label><textarea id="lav-note" rows="2" style="width:100%;border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-family:'Sora',sans-serif;font-size:.87rem;background:var(--bg);outline:none;resize:vertical" placeholder="Note aggiuntive..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('lavoro')">Annulla</button>
+      <button class="btn btn-ghost" onclick="addToGcal()" style="font-size:.8rem">📅 Aggiungi a Google Calendar</button>
+      <button class="btn btn-primary" onclick="saveLavoro()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL MATERIALE ══ -->
+<div class="modal-overlay" id="modal-materiale">
+  <div class="modal">
+    <h2 id="modal-mat-title">Nuovo materiale</h2>
+    <input type="hidden" id="mat-id">
+    <div class="form-row">
+      <div class="field"><label>Nome materiale *</label><input id="mat-nome" placeholder="es. Zirconia bianca"></div>
+      <div class="field"><label>Unità di misura</label><input id="mat-unita" placeholder="es. dischi, kg, flaconi"></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Quantità attuale</label><input id="mat-qty" type="number" min="0" placeholder="0"></div>
+      <div class="field"><label>Soglia minima (alert)</label><input id="mat-min" type="number" min="0" placeholder="2"></div>
+    </div>
+    <div class="field"><label>Fornitore</label><input id="mat-fornitore" placeholder="es. Ivoclar, VITA..."></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('materiale')">Annulla</button>
+      <button class="btn btn-primary" onclick="saveMateriale()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL FATTURA ══ -->
+<div class="modal-overlay" id="modal-fattura">
+  <div class="modal">
+    <h2>Nuova fattura</h2>
+    <input type="hidden" id="fat-id">
+    <div class="form-row">
+      <div class="field"><label>Studio / Dottore *</label><input id="fat-studio" placeholder="Studio Dr. Bianchi"></div>
+      <div class="field"><label>Data</label><input id="fat-data" type="date"></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Importo (€)</label><input id="fat-importo" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="field"><label>Stato</label>
+        <select id="fat-stato"><option>In attesa</option><option>Pagata</option><option>Scaduta</option></select>
+      </div>
+    </div>
+    <div class="field"><label>Descrizione</label><input id="fat-desc" placeholder="es. Lavori marzo 2025"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('fattura')">Annulla</button>
+      <button class="btn btn-primary" onclick="saveFattura()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL CARICA DA LAVORO ══ -->
+<div class="modal-overlay" id="modal-carica">
+  <div class="modal">
+    <h2>Carica dati da lavoro</h2>
+    <div class="field"><label>Seleziona lavoro</label>
+      <select id="carica-sel" style="width:100%;border:1px solid var(--border);border-radius:9px;padding:11px 14px;font-family:'Sora',sans-serif;font-size:.87rem;background:var(--bg);outline:none"></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('carica')">Annulla</button>
+      <button class="btn btn-primary" onclick="applicaLavoro()">Carica</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ FAB ══ -->
+<div class="fab" id="fab">
+  <div class="fab-menu" id="fab-menu">
+    <div class="fab-item" style="animation-delay:.05s" onclick="openVoice()">
+      <span class="fab-label">Input vocale</span>
+      <button class="fab-item-btn">🎤</button>
+    </div>
+    <div class="fab-item" style="animation-delay:.1s" onclick="openPhoto()">
+      <span class="fab-label">Foto prescrizione</span>
+      <button class="fab-item-btn">📷</button>
+    </div>
+    <div class="fab-item" style="animation-delay:.15s" onclick="openTemplates()">
+      <span class="fab-label">Template rapidi</span>
+      <button class="fab-item-btn">⚡</button>
+    </div>
+    <div class="fab-item" style="animation-delay:.2s" onclick="openImport()">
+      <span class="fab-label">Importa CSV/Excel</span>
+      <button class="fab-item-btn">📊</button>
+    </div>
+  </div>
+  <button class="fab-main" id="fab-main" onclick="toggleFab()">+</button>
+</div>
+
+<!-- ══ MODAL VOCE ══ -->
+<div class="modal-overlay" id="modal-voice">
+  <div class="modal" style="max-width:420px;text-align:center">
+    <h2>🎤 Input vocale</h2>
+    <p style="font-size:.83rem;color:var(--muted);margin-bottom:10px">Premi il microfono e parla. Esempio:<br><em>"Aggiungi lavoro paziente Rossi Mario, medico Bianchi, corona zirconia, scadenza 15 aprile"</em></p>
+    <div class="voice-circle" id="voice-circle" onclick="toggleVoice()">🎤</div>
+    <div id="voice-status" style="font-size:.8rem;color:var(--muted);margin-bottom:8px">Premi per iniziare</div>
+    <div class="voice-transcript" id="voice-transcript">Il testo apparirà qui...</div>
+    <div class="voice-result" id="voice-result">
+      <strong style="font-size:.82rem;color:var(--accent)">✅ Dati rilevati dall'AI:</strong>
+      <div id="voice-parsed" style="margin-top:8px;font-size:.85rem;text-align:left"></div>
+    </div>
+    <div class="modal-actions" style="justify-content:center;margin-top:16px">
+      <button class="btn btn-ghost" onclick="closeModal('voice')">Chiudi</button>
+      <button class="btn btn-primary" id="voice-confirm" style="display:none" onclick="confirmVoice()">✅ Conferma e salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL FOTO ══ -->
+<div class="modal-overlay" id="modal-photo">
+  <div class="modal" style="max-width:480px">
+    <h2>📷 Foto prescrizione</h2>
+    <p style="font-size:.83rem;color:var(--muted);margin-bottom:14px">Scatta o carica una foto della prescrizione del dentista. L'AI estrarrà automaticamente i dati.</p>
+    <div class="photo-drop" id="photo-drop" onclick="document.getElementById('photo-file').click()">
+      <div id="photo-placeholder">📋 Tocca per selezionare una foto<br><span style="font-size:.75rem;color:var(--muted)">o trascina qui l'immagine</span></div>
+      <img id="photo-preview-img" style="display:none">
+    </div>
+    <input type="file" id="photo-file" accept="image/*" capture="environment" style="display:none" onchange="handlePhotoUpload(event)">
+    <div class="photo-analyzing" id="photo-analyzing">
+      <div style="font-size:1.5rem;margin-bottom:8px">🔍</div>
+      <div style="font-weight:700;margin-bottom:4px">L'AI sta analizzando...</div>
+      <div style="font-size:.8rem;color:var(--muted)">Estraggo paziente, medico, tipo dispositivo e materiali</div>
+    </div>
+    <div class="voice-result" id="photo-result">
+      <strong style="font-size:.82rem;color:var(--accent)">✅ Dati estratti dalla foto:</strong>
+      <div id="photo-parsed" style="margin-top:8px;font-size:.85rem"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('photo')">Annulla</button>
+      <button class="btn btn-primary" id="photo-confirm" style="display:none" onclick="confirmPhoto()">✅ Apri modulo precompilato</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL TEMPLATE ══ -->
+<div class="modal-overlay" id="modal-template">
+  <div class="modal">
+    <h2>⚡ Template rapidi</h2>
+    <p style="font-size:.83rem;color:var(--muted);margin-bottom:14px">Seleziona un template per precompilare il modulo lavoro. Puoi salvare i tuoi template dai lavori più comuni.</p>
+    <div class="tpl-grid" id="tpl-grid"></div>
+    <button class="btn btn-ghost" style="width:100%;margin-bottom:14px" onclick="saveCurrentAsTemplate()">+ Salva lavoro attuale come template</button>
+    <div id="tpl-empty" style="text-align:center;color:var(--muted);font-size:.87rem;padding:20px;display:none">Nessun template salvato.<br>Apri un lavoro e salvalo come template!</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('template')">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL IMPORT ══ -->
+<div class="modal-overlay" id="modal-import">
+  <div class="modal">
+    <h2>📊 Importa da CSV / Excel</h2>
+    <p style="font-size:.83rem;color:var(--muted);margin-bottom:6px">Il file deve avere queste colonne (in qualsiasi ordine):<br>
+    <code style="font-size:.75rem;background:var(--bg2);padding:2px 6px;border-radius:4px">paziente, dottore, tipo, materiale, scadenza, stato</code></p>
+    <div style="margin-bottom:14px">
+      <a href="#" onclick="downloadCSVTemplate()" style="font-size:.8rem;color:var(--accent)">📥 Scarica template CSV di esempio</a>
+    </div>
+    <div class="import-drop" onclick="document.getElementById('import-file').click()">
+      📂 Clicca per selezionare CSV o Excel<br>
+      <span style="font-size:.75rem;color:var(--muted)">.csv, .xlsx, .xls</span>
+    </div>
+    <input type="file" id="import-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleImport(event)">
+    <div id="import-preview-wrap" style="display:none">
+      <div style="font-size:.82rem;font-weight:700;margin-bottom:8px" id="import-count"></div>
+      <div class="import-preview" id="import-preview"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('import')">Annulla</button>
+      <button class="btn btn-primary" id="import-confirm" style="display:none" onclick="confirmImport()">✅ Importa tutti</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL VOCE DICHIARAZIONE ══ -->
+<div class="modal-overlay" id="modal-dich-voice">
+  <div class="modal" style="max-width:420px;text-align:center">
+    <h2>🎤 Compila dichiarazione con voce</h2>
+    <p style="font-size:.83rem;color:var(--muted);margin-bottom:10px">Esempio:<br><em>"Paziente Mario Rossi, nato il 15 marzo 1970, medico Bianchi, studio dentistico Bianchi, corona in zirconia elemento 14, materiale zirconia Y-TZP, fresatura CAD/CAM"</em></p>
+    <div class="voice-circle" id="dich-voice-circle" onclick="toggleDichVoice()">🎤</div>
+    <div id="dich-voice-status" style="font-size:.8rem;color:var(--muted);margin-bottom:8px">Premi per iniziare</div>
+    <div class="voice-transcript" id="dich-voice-transcript">Il testo apparirà qui...</div>
+    <div class="voice-result" id="dich-voice-result">
+      <strong style="font-size:.82rem;color:var(--accent)">✅ Dati rilevati:</strong>
+      <div id="dich-voice-parsed" style="margin-top:8px;font-size:.85rem;text-align:left"></div>
+    </div>
+    <div class="modal-actions" style="justify-content:center;margin-top:16px">
+      <button class="btn btn-ghost" onclick="closeModal('dich-voice');stopDichVoice()">Chiudi</button>
+      <button class="btn btn-primary" id="dich-voice-confirm" style="display:none" onclick="confirmDichVoice()">✅ Compila dichiarazione</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL FOTO DICHIARAZIONE ══ -->
+<div class="modal-overlay" id="modal-dich-photo">
+  <div class="modal" style="max-width:480px">
+    <h2>📷 Scansiona prescrizione</h2>
+    <p style="font-size:.83rem;color:var(--muted);margin-bottom:14px">Scatta o carica una foto della prescrizione del dentista. L'AI compilerà automaticamente tutti i campi.</p>
+    <div class="photo-drop" onclick="document.getElementById('dich-photo-file').click()">
+      <div id="dich-photo-placeholder">📋 Tocca per selezionare foto<br><span style="font-size:.75rem;color:var(--muted)">Fotocamera o galleria</span></div>
+      <img id="dich-photo-img" style="display:none;max-width:100%;max-height:200px;border-radius:8px;margin-top:10px">
+    </div>
+    <input type="file" id="dich-photo-file" accept="image/*" capture="environment" style="display:none" onchange="handleDichPhoto(event)">
+    <div class="photo-analyzing" id="dich-photo-analyzing">
+      <div style="font-size:1.5rem;margin-bottom:8px">🔍</div>
+      <div style="font-weight:700;margin-bottom:4px">Analizzo la prescrizione...</div>
+      <div style="font-size:.8rem;color:var(--muted)">Estraggo tutti i dati del paziente e del dispositivo</div>
+    </div>
+    <div class="voice-result" id="dich-photo-result">
+      <strong style="font-size:.82rem;color:var(--accent)">✅ Dati estratti:</strong>
+      <div id="dich-photo-parsed" style="margin-top:8px;font-size:.85rem"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('dich-photo')">Annulla</button>
+      <button class="btn btn-primary" id="dich-photo-confirm" style="display:none" onclick="confirmDichPhoto()">✅ Compila dichiarazione</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════
+// DB
+// ══════════════════════════════════════
+const DB = {
+  get:(k)=>JSON.parse(localStorage.getItem('dl_'+k)||'[]'),
+  set:(k,v)=>localStorage.setItem('dl_'+k,JSON.stringify(v)),
+  getObj:(k)=>JSON.parse(localStorage.getItem('dl_'+k)||'{}'),
+  setObj:(k,v)=>localStorage.setItem('dl_'+k,JSON.stringify(v))
+};
+
+let settings = {};
+let chatHistory = [];
+let chatLoading = false;
+let setupMats = [];
+let editingLavId = null;
+let editingMatId = null;
+let editingFatId = null;
+
+// ══════════════════════════════════════
+// INIT
+// ══════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  settings = DB.getObj('settings');
+  if (!settings.setup) { showLoginPage(); return; }
+  if (settings.pin) { showLoginPage(); return; }
+  initApp();
+});
+
+function initApp() {
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+  updateApiPill();
+  loadSettingsForm();
+  renderDashboard();
+  setTimeout(initGoogleCalendar, 2000);
+  setTimeout(autoBackup, 5000);
+  document.querySelectorAll('[data-page]').forEach(btn => {
+    btn.addEventListener('click', () => showPage(btn.dataset.page));
+  });
+}
+
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('[data-page]').forEach(b => b.classList.toggle('active', b.dataset.page === page));
+  document.getElementById('page-'+page).classList.add('active');
+  const titles = {dashboard:'Dashboard',lavori:'Lavori',agenda:'Agenda',magazzino:'Magazzino',dichiarazioni:'Dichiarazioni di Conformità',fatture:'Fatture',chat:'Assistente AI',impostazioni:'Impostazioni'};
+  document.getElementById('pageTitle').textContent = titles[page]||page;
+  const renders = {dashboard:renderDashboard,lavori:renderLavori,agenda:renderAgenda,magazzino:renderMagazzino,fatture:renderFatture};
+  if (renders[page]) renders[page]();
+}
+
+function updateApiPill() {
+  const has = settings.apikey && settings.apikey.startsWith('sk-');
+  document.getElementById('apiPill').className = 'api-pill '+(has?'ok':'err');
+  document.getElementById('apiLed').className = 'led '+(has?'g':'r');
+  document.getElementById('apiTxt').textContent = has ? 'AI Connessa' : 'API non configurata';
+}
+
+// ══════════════════════════════════════
+// SETUP WIZARD + PIN + BACKUP
+// ══════════════════════════════════════
+let currentStep = 0;
+let backupData = null;
+
+function showStep(n) { currentStep = n; }
+
+function hideAllSetupPages() {
+  ['setup-page-0','setup-page-1','setup-page-2','setup-page-3','setup-page-recover'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+}
+
+function showLoginPage() {
+  hideAllSetupPages();
+  document.getElementById('setup-page-0').style.display = 'block';
+  if (!settings.pin && !settings.setup) {
+    document.getElementById('setup-page-0').innerHTML = `
+      <div class="setup-title">Benvenuto in DentaLab! 🦷</div>
+      <div class="setup-sub">Prima configurazione — ci vogliono 2 minuti.</div>
+      <div style="margin-top:20px;display:flex;gap:10px;flex-direction:column">
+        <button class="btn btn-primary" style="width:100%;font-size:1rem;padding:14px" onclick="showNewSetup()">➕ Inizia configurazione</button>
+        <button class="btn btn-ghost" style="width:100%" onclick="showRecoverPage()">📂 Recupera backup esistente</button>
+      </div>`;
+  }
+}
+
+function showNewSetup() {
+  hideAllSetupPages();
+  document.getElementById('setup-page-1').style.display = 'block';
+  document.getElementById('setup').scrollTop = 0;
+}
+
+function showRecoverPage() {
+  hideAllSetupPages();
+  document.getElementById('setup-page-recover').style.display = 'block';
+  document.getElementById('setup').scrollTop = 0;
+}
+
+function loginWithPin() {
+  const pin = document.getElementById('s-pin-login')?.value.trim();
+  if (!pin) return;
+  if (pin === settings.pin) {
+    document.getElementById('s-pin-error').style.display = 'none';
+    initApp();
+  } else {
+    document.getElementById('s-pin-error').style.display = 'block';
+    document.getElementById('s-pin-login').value = '';
+    document.getElementById('s-pin-login').focus();
+  }
+}
+
+function gotoPage2() {
+  const nm = document.getElementById('s-labname').value.trim();
+  const tc = document.getElementById('s-tecnico').value.trim();
+  const pin = document.getElementById('s-pin').value.trim();
+  if (!nm || !tc) { alert('Inserisci almeno il nome del laboratorio e il tuo nome'); return; }
+  if (!pin || pin.length < 4) { alert('Scegli un PIN di 4 cifre'); return; }
+  settings.labname = nm;
+  settings.tecnico = tc;
+  settings.indirizzo = document.getElementById('s-indirizzo').value.trim();
+  settings.tel = document.getElementById('s-tel').value.trim();
+  settings.pin = pin;
+  hideAllSetupPages();
+  document.getElementById('setup-page-2').style.display = 'block';
+  document.getElementById('setup').scrollTop = 0;
+}
+
+function gotoPage3() {
+  const ak = document.getElementById('s-apikey').value.trim();
+  if (ak) settings.apikey = ak;
+  hideAllSetupPages();
+  document.getElementById('setup-page-3').style.display = 'block';
+  document.getElementById('setup').scrollTop = 0;
+  renderSetupMats();
+}
+
+function setupNext(step, skip=false) {
+  if (step===0) gotoPage2();
+  else if (step===1) gotoPage3();
+}
+
+function addSetupMat() {
+  setupMats.push({nome:'',qty:0,unita:'',min:2});
+  renderSetupMats();
+}
+
+function renderSetupMats() {
+  const el = document.getElementById('setup-mat-list');
+  el.innerHTML = setupMats.map((m,i)=>`
+    <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-bottom:8px;align-items:center">
+      <input placeholder="Nome materiale" value="${m.nome}" oninput="setupMats[${i}].nome=this.value" style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-family:'Sora',sans-serif;font-size:.85rem;background:var(--bg);outline:none">
+      <input placeholder="Qtà" type="number" value="${m.qty}" oninput="setupMats[${i}].qty=+this.value" style="width:60px;border:1px solid var(--border);border-radius:8px;padding:8px;font-family:'Sora',sans-serif;font-size:.85rem;background:var(--bg);outline:none">
+      <button onclick="setupMats.splice(${i},1);renderSetupMats()" style="border:none;background:none;cursor:pointer;color:var(--danger);font-size:1.1rem">×</button>
+    </div>`).join('');
+}
+
+function setupFinish() {
+  const mats = setupMats.filter(m=>m.nome.trim()).map((m,i)=>({id:Date.now()+i,nome:m.nome.trim(),quantita:m.qty||0,unita:m.unita||'pz',minimo:m.min||2,fornitore:''}));
+  DB.set('materiali', mats);
+  settings.setup = true;
+  DB.setObj('settings', settings);
+  setTimeout(autoBackup, 1000);
+  initApp();
+}
+
+// ══════════════════════════════════════
+// BACKUP
+// ══════════════════════════════════════
+function getFullBackup() {
+  return {
+    version: 1,
+    date: new Date().toISOString(),
+    settings: DB.getObj('settings'),
+    lavori: DB.get('lavori'),
+    materiali: DB.get('materiali'),
+    fatture: DB.get('fatture'),
+    templates: DB.get('templates')
+  };
+}
+
+function autoBackup() {
+  try {
+    localStorage.setItem('dl_last_backup', JSON.stringify(getFullBackup()));
+  } catch(e) {}
+}
+
+function esportaBackup() {
+  const backup = getFullBackup();
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `dentalab_backup_${today()}.json`;
+  a.click();
+  showGcalToast('✅ Backup esportato!');
+}
+
+function loadBackupFile(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      backupData = JSON.parse(ev.target.result);
+      if (!backupData.settings) { alert('File non valido.'); return; }
+      document.getElementById('backup-pin-wrap').style.display = 'block';
+      document.getElementById('backup-confirm-btn').style.display = 'inline-block';
+      showGcalToast('✅ File caricato — inserisci il PIN');
+    } catch(err) { alert('File non valido o corrotto.'); }
+  };
+  reader.readAsText(file);
+}
+
+function confirmRecover() {
+  if (!backupData) return;
+  const pin = document.getElementById('s-pin-recover').value.trim();
+  if (backupData.settings.pin && pin !== backupData.settings.pin) {
+    document.getElementById('s-pin-recover-error').style.display = 'block';
+    return;
+  }
+  DB.setObj('settings', backupData.settings);
+  DB.set('lavori', backupData.lavori || []);
+  DB.set('materiali', backupData.materiali || []);
+  DB.set('fatture', backupData.fatture || []);
+  DB.set('templates', backupData.templates || []);
+  settings = backupData.settings;
+  showGcalToast('✅ Dati recuperati!');
+  setTimeout(initApp, 800);
+}
+
+// ══════════════════════════════════════
+// TOAST & VALIDATION HELPERS
+// ══════════════════════════════════════
+function toast(msg, type='success') {
+  const t = document.createElement('div');
+  const bg = type==='success'?'var(--accent)':type==='error'?'var(--danger)':'var(--warn)';
+  t.textContent = msg;
+  t.style.cssText = `position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:${bg};color:#fff;padding:10px 22px;border-radius:10px;font-size:.87rem;font-weight:700;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2);white-space:nowrap;pointer-events:none`;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 2800);
+}
+
+function validateField(id, condition) {
+  const el = document.getElementById(id); if (!el) return true;
+  if (!condition) { el.classList.add('error'); el.addEventListener('input',()=>el.classList.remove('error'),{once:true}); return false; }
+  el.classList.remove('error'); return true;
+}
+
+function emptyState(msg) {
+  return `<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:32px;font-size:.9rem">${msg}</td></tr>`;
+}
+
+// ── Proxy helper — usa SEMPRE Netlify, mai browser diretto
+async function callAI(prompt, imageBase64=null) {
+  const messages = imageBase64
+    ? [{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:imageBase64}},{type:'text',text:prompt}]}]
+    : [{role:'user',content:prompt}];
+  const res = await fetch('/claude', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({apiKey:settings.apikey, messages})
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data.text || '';
+}
+
+function renderDashboard() {
+  const lavori = DB.get('lavori');
+  const mats = DB.get('materiali');
+  const fatture = DB.get('fatture');
+  const oggi = today();
+  const attivi = lavori.filter(l=>l.stato!=='Completato').length;
+  const urgenti = lavori.filter(l=>l.scadenza===oggi||l.stato==='Urgente').length;
+  const fatNoPag = fatture.filter(f=>f.stato==='In attesa').length;
+  const matBasse = mats.filter(m=>m.quantita<=m.minimo).length;
+
+  document.getElementById('kpi-grid').innerHTML = `
+    <div class="kpi" onclick="showPage('lavori')" style="cursor:pointer">
+      <div class="kpi-label">Lavori attivi</div>
+      <div class="kpi-val">${attivi}</div>
+      <div class="kpi-sub">in gestione</div>
+    </div>
+    <div class="kpi" onclick="showPage('lavori')" style="cursor:pointer;${urgenti>0?'border-color:var(--danger)':''}">
+      <div class="kpi-label">Scadono oggi</div>
+      <div class="kpi-val" style="${urgenti>0?'color:var(--danger)':''}">${urgenti}</div>
+      <div class="kpi-sub">${urgenti>0?'⚠️ attenzione':'tutto ok'}</div>
+    </div>
+    <div class="kpi" onclick="showPage('fatture')" style="cursor:pointer;${fatNoPag>0?'border-color:var(--warn)':''}">
+      <div class="kpi-label">Fatture in attesa</div>
+      <div class="kpi-val" style="${fatNoPag>0?'color:var(--warn)':''}">${fatNoPag}</div>
+      <div class="kpi-sub">da incassare</div>
+    </div>
+    <div class="kpi" onclick="showPage('magazzino')" style="cursor:pointer;${matBasse>0?'border-color:var(--danger)':''}">
+      <div class="kpi-label">Materiali esauriti</div>
+      <div class="kpi-val" style="${matBasse>0?'color:var(--danger)':''}">${matBasse}</div>
+      <div class="kpi-sub">${matBasse>0?'⚠️ riordinare':'scorte ok'}</div>
+    </div>`;
+
+  const recenti = [...lavori].sort((a,b)=>new Date(b.creato)-new Date(a.creato)).slice(0,8);
+  document.getElementById('dash-lavori').innerHTML = recenti.length ? recenti.map(l=>`
+    <tr><td>${l.paziente}</td><td>${l.dottore}</td><td>${l.tipo}</td>
+    <td>${fmtDate(l.scadenza)}</td><td>${badgeSt(l.stato)}</td></tr>`).join('')
+    : emptyState('Nessun lavoro ancora — <a href="#" onclick="showPage(\'lavori\')" style="color:var(--accent)">aggiungi il primo 🦷</a>');
+}
+
+// ══════════════════════════════════════
+// LAVORI
+// ══════════════════════════════════════
+function renderLavori() {
+  const q = (document.getElementById('lavori-search')?.value||'').toLowerCase().trim();
+  let lavori = DB.get('lavori');
+  if (q) lavori = lavori.filter(l =>
+    (l.paziente||'').toLowerCase().includes(q) ||
+    (l.dottore||'').toLowerCase().includes(q) ||
+    (l.tipo||'').toLowerCase().includes(q) ||
+    (l.materiale||'').toLowerCase().includes(q)
+  );
+  document.getElementById('lavori-tbody').innerHTML = lavori.length ? lavori.map(l=>`
+    <tr><td style="font-size:.75rem;color:var(--muted)">#${l.id.toString().slice(-4)}</td>
+    <td><strong>${l.paziente}</strong></td><td>${l.dottore}</td><td>${l.tipo}</td>
+    <td>${l.materiale||'—'}</td><td>${fmtDate(l.scadenza)}</td><td>${badgeSt(l.stato)}</td>
+    <td><button class="action-btn" onclick="editLavoro('${l.id}')">✏️</button>
+        <button class="action-btn" onclick="duplicaLavoro('${l.id}')" title="Duplica">📋</button>
+        <button class="action-btn" onclick="prefillDich('${l.id}')">📄</button>
+        <button class="action-btn" onclick="delLavoro('${l.id}')">🗑</button></td></tr>`).join('')
+    : emptyState(q ? `Nessun risultato per "${q}"` : '🦷 Nessun lavoro ancora — clicca "+ Nuovo lavoro"');
+}
+
+function openModal(type) {
+  if (type==='lavoro') {
+    editingLavId = null;
+    document.getElementById('modal-lavoro-title').textContent = 'Nuovo lavoro';
+    document.getElementById('lav-id').value='';
+    ['paziente','dottore','studio','denom','materiale','note'].forEach(f=>document.getElementById('lav-'+f).value='');
+    document.getElementById('lav-tipo').value='Protesi fissa';
+    document.getElementById('lav-stato').value='In attesa';
+    document.getElementById('lav-datapres').value=today();
+    document.getElementById('lav-scadenza').value='';
+  } else if (type==='materiale') {
+    editingMatId = null;
+    document.getElementById('modal-mat-title').textContent = 'Nuovo materiale';
+    ['nome','unita','fornitore'].forEach(f=>document.getElementById('mat-'+f).value='');
+    document.getElementById('mat-qty').value=0;
+    document.getElementById('mat-min').value=2;
+  } else if (type==='fattura') {
+    editingFatId = null;
+    ['studio','desc'].forEach(f=>document.getElementById('fat-'+f).value='');
+    document.getElementById('fat-data').value=today();
+    document.getElementById('fat-importo').value='';
+    document.getElementById('fat-stato').value='In attesa';
+  }
+  document.getElementById('modal-'+type).classList.add('open');
+}
+function closeModal(type) { document.getElementById('modal-'+type).classList.remove('open'); }
+
+function saveLavoro() {
+  const paz = document.getElementById('lav-paziente').value.trim();
+  const doc = document.getElementById('lav-dottore').value.trim();
+  const sca = document.getElementById('lav-scadenza').value;
+  let ok = true;
+  if (!validateField('lav-paziente', paz)) ok = false;
+  if (!validateField('lav-dottore', doc)) ok = false;
+  if (!validateField('lav-scadenza', sca)) ok = false;
+  if (!ok) { toast('Compila i campi obbligatori evidenziati in rosso', 'error'); return; }
+  const lavori = DB.get('lavori');
+  const lav = {
+    id: editingLavId || Date.now(),
+    paziente: paz, dottore: doc,
+    studio: document.getElementById('lav-studio').value.trim(),
+    tipo: document.getElementById('lav-tipo').value,
+    stato: document.getElementById('lav-stato').value,
+    denominazione: document.getElementById('lav-denom').value.trim(),
+    materiale: document.getElementById('lav-materiale').value.trim(),
+    datapres: document.getElementById('lav-datapres').value,
+    scadenza: sca,
+    note: document.getElementById('lav-note').value.trim(),
+    creato: editingLavId ? (lavori.find(l=>l.id==editingLavId)?.creato||new Date().toISOString()) : new Date().toISOString()
+  };
+  if (editingLavId) {
+    const idx = lavori.findIndex(l=>l.id==editingLavId);
+    if (idx>-1) lavori[idx]=lav;
+  } else { lavori.push(lav); }
+  DB.set('lavori',lavori);
+  closeModal('lavoro');
+  toast('✅ Lavoro salvato!');
+  renderLavori();
+  renderDashboard();
+  // Auto-sync Google Calendar
+  if (sca && !editingLavId) syncToGoogleCalendar(lav);
+}
+
+function editLavoro(id) {
+  const l = DB.get('lavori').find(x=>x.id==id);
+  if (!l) return;
+  editingLavId = id;
+  document.getElementById('modal-lavoro-title').textContent = 'Modifica lavoro';
+  document.getElementById('lav-id').value = id;
+  document.getElementById('lav-paziente').value = l.paziente||'';
+  document.getElementById('lav-dottore').value = l.dottore||'';
+  document.getElementById('lav-studio').value = l.studio||'';
+  document.getElementById('lav-tipo').value = l.tipo||'Protesi fissa';
+  document.getElementById('lav-stato').value = l.stato||'In attesa';
+  document.getElementById('lav-denom').value = l.denominazione||'';
+  document.getElementById('lav-materiale').value = l.materiale||'';
+  document.getElementById('lav-datapres').value = l.datapres||today();
+  document.getElementById('lav-scadenza').value = l.scadenza||'';
+  document.getElementById('lav-note').value = l.note||'';
+  document.getElementById('modal-lavoro').classList.add('open');
+}
+
+function delLavoro(id) {
+  if (!confirm('Eliminare questo lavoro?')) return;
+  DB.set('lavori', DB.get('lavori').filter(l=>l.id!=id));
+  toast('🗑 Lavoro eliminato', 'warn');
+  renderLavori(); renderDashboard();
+}
+
+function prefillDich(id) {
+  const l = DB.get('lavori').find(x=>x.id==id);
+  if (!l) return;
+  showPage('dichiarazioni');
+  document.getElementById('d-medico').value = l.dottore||'';
+  document.getElementById('d-studio').value = l.studio||'';
+  document.getElementById('d-datapres').value = l.datapres||today();
+  document.getElementById('d-data').value = today();
+  document.getElementById('d-denom').value = l.denominazione||'';
+  document.getElementById('d-mat').value = l.materiale||'';
+  document.getElementById('d-codice').value = 'LAB-'+l.id.toString().slice(-6);
+  document.getElementById('d-numero').value = String(DB.get('lavori').indexOf(l)+1).padStart(3,'0');
+  document.getElementById('d-anno').value = new Date().getFullYear();
+  document.getElementById('d-tecnica').value = l.tipo==='Dispositivo stampato in 3D' ? 'Stampa 3D' : 'Fresatura CAD/CAM';
+  // checkboxes
+  ['fissa','mobile','orto','3d'].forEach(t=>document.getElementById('d-'+t).checked=false);
+  if (l.tipo==='Protesi fissa') document.getElementById('d-fissa').checked=true;
+  else if (l.tipo==='Protesi mobile / rimovibile') document.getElementById('d-mobile').checked=true;
+  else if (l.tipo==='Apparecchio ortodontico') document.getElementById('d-orto').checked=true;
+  else if (l.tipo==='Dispositivo stampato in 3D') document.getElementById('d-3d').checked=true;
+}
+
+// ══════════════════════════════════════
+// AGENDA
+// ══════════════════════════════════════
+function renderAgenda() {
+  const lavori = DB.get('lavori').filter(l=>l.stato!=='Completato');
+  const weekDays = getWeekDays();
+  const grid = document.getElementById('week-grid');
+  const dayNames = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+  grid.innerHTML = weekDays.map((d,i)=>{
+    const isToday = d===today();
+    const dayLavori = lavori.filter(l=>l.scadenza===d);
+    return `<div class="day-col${isToday?' today':''}">
+      <div class="day-label">${dayNames[i]} ${fmtDateShort(d)}</div>
+      ${dayLavori.map(l=>`<div class="appt ${l.stato==='Urgente'?'urgente':l.stato==='In corso'?'corso':''}" onclick="editLavoro('${l.id}')" title="${l.paziente}">${l.paziente.split(' ')[0]}</div>`).join('')}
+    </div>`;
+  }).join('');
+
+  const sorted = [...lavori].sort((a,b)=>new Date(a.scadenza)-new Date(b.scadenza));
+  document.getElementById('agenda-tbody').innerHTML = sorted.length ? sorted.map(l=>`
+    <tr><td>${fmtDate(l.scadenza)}</td><td><strong>${l.paziente}</strong></td>
+    <td>${l.tipo}</td><td>${badgeSt(l.stato)}</td>
+    <td><button class="action-btn" onclick="addToGcalDirect('${l.id}')">📅</button>
+        <button class="action-btn" onclick="editLavoro('${l.id}')">✏️</button></td></tr>`).join('')
+    : `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Nessun lavoro in agenda</td></tr>`;
+}
+
+function addToGcal() {
+  const paz = document.getElementById('lav-paziente').value.trim();
+  const sca = document.getElementById('lav-scadenza').value;
+  const tipo = document.getElementById('lav-tipo').value;
+  if (!paz||!sca) return;
+  const d = sca.replace(/-/g,'');
+  const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('DentaLab: '+paz)}&dates=${d}/${d}&details=${encodeURIComponent(tipo+' - '+paz)}`;
+  window.open(url,'_blank');
+}
+
+function addToGcalDirect(id) {
+  const l = DB.get('lavori').find(x=>x.id==id);
+  if (!l) return;
+  const d = l.scadenza.replace(/-/g,'');
+  const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('DentaLab: '+l.paziente)}&dates=${d}/${d}&details=${encodeURIComponent(l.tipo+' - '+l.paziente+(l.dottore?' - '+l.dottore:''))}`;
+  window.open(url,'_blank');
+}
+
+function openGcalSetup() {
+  showPage('impostazioni');
+  setTimeout(()=>document.getElementById('cfg-gcal').focus(),200);
+}
+
+// ══════════════════════════════════════
+// MAGAZZINO
+// ══════════════════════════════════════
+function renderMagazzino() {
+  const mats = DB.get('materiali');
+  const grid = document.getElementById('mag-grid');
+  if (!mats.length) {
+    grid.innerHTML = `<div style="color:var(--muted);font-size:.9rem;padding:20px">Nessun materiale — clicca "+ Aggiungi materiale"</div>`;
+    return;
+  }
+  grid.innerHTML = mats.map(m=>{
+    const pct = m.minimo>0 ? Math.min(100,Math.round((m.quantita/Math.max(m.minimo*3,1))*100)) : 60;
+    const cls = m.quantita<=0?'critical':m.quantita<=m.minimo?'low':'';
+    return `<div class="mag-card">
+      <div class="mag-name">${m.nome}</div>
+      <div><span class="mag-qty">${m.quantita}</span> <span class="mag-unit">${m.unita||'pz'}</span></div>
+      ${m.fornitore?`<div style="font-size:.72rem;color:var(--muted);margin-top:2px">${m.fornitore}</div>`:''}
+      ${m.quantita<=m.minimo?`<div style="font-size:.72rem;color:var(--danger);margin-top:4px;font-weight:700">⚠ Scorta bassa (min. ${m.minimo})</div>`:''}
+      <div class="mag-bar"><div class="mag-fill ${cls}" style="width:${pct}%"></div></div>
+      <div style="display:flex;gap:6px;margin-top:10px">
+        <button class="action-btn" onclick="adjustQty(${m.id},1)" style="background:var(--accent-light);color:var(--accent);font-weight:700">+1</button>
+        <button class="action-btn" onclick="adjustQty(${m.id},-1)" style="background:#fdecea;color:var(--danger);font-weight:700">-1</button>
+        <button class="action-btn" onclick="editMat(${m.id})">✏️</button>
+        <button class="action-btn" onclick="delMat(${m.id})">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function adjustQty(id,delta) {
+  const mats = DB.get('materiali');
+  const m = mats.find(x=>x.id===id);
+  if (m) { m.quantita = Math.max(0,(m.quantita||0)+delta); DB.set('materiali',mats); renderMagazzino(); }
+}
+
+function editMat(id) {
+  const m = DB.get('materiali').find(x=>x.id===id);
+  if (!m) return;
+  editingMatId = id;
+  document.getElementById('modal-mat-title').textContent = 'Modifica materiale';
+  document.getElementById('mat-id').value = id;
+  document.getElementById('mat-nome').value = m.nome;
+  document.getElementById('mat-unita').value = m.unita||'';
+  document.getElementById('mat-qty').value = m.quantita||0;
+  document.getElementById('mat-min').value = m.minimo||2;
+  document.getElementById('mat-fornitore').value = m.fornitore||'';
+  document.getElementById('modal-materiale').classList.add('open');
+}
+
+function saveMateriale() {
+  const nome = document.getElementById('mat-nome').value.trim();
+  if (!validateField('mat-nome', nome)) { toast('Inserisci il nome del materiale', 'error'); return; }
+  const mats = DB.get('materiali');
+  const mat = {
+    id: editingMatId || Date.now(),
+    nome, unita: document.getElementById('mat-unita').value.trim()||'pz',
+    quantita: +document.getElementById('mat-qty').value||0,
+    minimo: +document.getElementById('mat-min').value||2,
+    fornitore: document.getElementById('mat-fornitore').value.trim()
+  };
+  if (editingMatId) { const i=mats.findIndex(m=>m.id===editingMatId); if(i>-1)mats[i]=mat; }
+  else mats.push(mat);
+  DB.set('materiali',mats);
+  closeModal('materiale');
+  toast('✅ Materiale salvato!');
+  renderMagazzino();
+  renderDashboard();
+}
+
+function delMat(id) {
+  if (!confirm('Eliminare questo materiale?')) return;
+  DB.set('materiali', DB.get('materiali').filter(m=>m.id!==id));
+  toast('🗑 Materiale eliminato', 'warn');
+  renderMagazzino();
+  renderDashboard();
+}
+
+// ══════════════════════════════════════
+// DICHIARAZIONI DI CONFORMITÀ PDF
+// ══════════════════════════════════════
+function generaPDF(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const W=210, lm=18, rm=192, cw=rm-lm;
+
+  // Leggi campi
+  const num   = document.getElementById('d-numero').value||'___';
+  const anno  = document.getElementById('d-anno').value||new Date().getFullYear();
+  const dat   = document.getElementById('d-data').value ? fmtDate(document.getElementById('d-data').value) : fmtDate(today());
+  const cod   = document.getElementById('d-codice').value||'';
+  const nascita = document.getElementById('d-nascita').value ? fmtDate(document.getElementById('d-nascita').value) : '__ / __ / ____';
+  const npres = document.getElementById('d-npres').value||'';
+  const med   = document.getElementById('d-medico').value||'';
+  const stu   = document.getElementById('d-studio').value||'';
+  const dp    = document.getElementById('d-datapres').value ? fmtDate(document.getElementById('d-datapres').value) : '__ / __ / ____';
+  const den   = document.getElementById('d-denom').value||'';
+  const matricola = document.getElementById('d-matricola').value||'';
+  const mat   = document.getElementById('d-mat').value||'';
+  const fornitore = document.getElementById('d-fornitore').value||'';
+  const tecnica   = document.getElementById('d-tecnica').value||'';
+  const isFissa   = document.getElementById('d-fissa').checked;
+  const isMobile  = document.getElementById('d-mobile').checked;
+  const isOrto    = document.getElementById('d-orto').checked;
+  const is3D      = document.getElementById('d-3d').checked;
+  const rRischi   = document.getElementById('d-rischi').checked;
+  const rProcesso = document.getElementById('d-processo').checked;
+  const rRintracciabile = document.getElementById('d-rintracciabile').checked;
+  const rComunicati     = document.getElementById('d-rischicom').checked;
+  const rArchivio       = document.getElementById('d-archivio').checked;
+
+  // Dati laboratorio dalle impostazioni
+  const lab   = settings.labname||'';
+  const tec   = settings.tecnico||'';
+  const ind   = settings.indirizzo||'';
+  const luogo = settings.luogo||'';
+  const tel   = settings.tel||'';
+  const email = settings.email||'';
+  const piva  = settings.piva||'';
+  const mins  = settings.minsalute||'';
+
+  let y=12;
+
+  // ── TITOLO
+  doc.setFont('helvetica','bold'); doc.setFontSize(14);
+  doc.text('DICHIARAZIONE DI CONFORMITÀ', W/2, y, {align:'center'}); y+=6;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  doc.text('N° '+num+' / '+anno+'     Data: '+dat, W/2, y, {align:'center'}); y+=5;
+  doc.setFontSize(8); doc.setTextColor(80);
+  doc.text('Redatta ai sensi del Regolamento (UE) 2017/745 (MDR) – Allegato XIII | D.Lgs. 137/2022', W/2, y, {align:'center'});
+  doc.setTextColor(0); y+=6;
+  doc.setLineWidth(0.6); doc.setDrawColor(26,107,74);
+  doc.line(lm, y, rm, y); y+=6;
+
+  // ── SEZ 1: FABBRICANTE
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(26,107,74);
+  doc.text('1. DATI DEL FABBRICANTE', lm, y); y+=5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(0);
+  doc.text('Nome / Ragione Sociale: '+lab, lm, y); y+=4.5;
+  doc.text('Responsabile Tecnico: '+tec, lm, y); y+=4.5;
+  doc.text('Indirizzo sede legale: '+ind, lm, y); y+=4.5;
+  doc.text('Luogo di fabbricazione: '+luogo, lm, y); y+=4.5;
+  doc.text('Telefono: '+tel, lm, y);
+  doc.text('Email: '+email, lm+70, y); y+=4.5;
+  doc.text('P.IVA / C.F.: '+piva, lm, y);
+  doc.text('N° iscrizione Min. Salute: '+mins, lm+70, y); y+=6;
+
+  // ── SEZ 2: PAZIENTE
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(26,107,74);
+  doc.text('2. DATI DEL PAZIENTE / DESTINATARIO', lm, y); y+=5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(0);
+  doc.text('Codice identificativo: '+cod, lm, y); y+=4.5;
+  doc.text('Data di nascita: '+nascita, lm, y); y+=4.5;
+  doc.text('Medico prescrittore: Dr. / Dr.ssa '+med, lm, y); y+=4.5;
+  doc.text('Studio / Clinica: '+stu, lm, y); y+=4.5;
+  doc.text('N° prescrizione: '+npres, lm, y);
+  doc.text('Data prescrizione: '+dp, lm+80, y); y+=6;
+
+  // ── SEZ 3: DISPOSITIVO
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(26,107,74);
+  doc.text('3. DESCRIZIONE DEL DISPOSITIVO MEDICO SU MISURA', lm, y); y+=5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(0);
+
+  // Checkboxes 2x2
+  const bs=4; const checks=[[{l:'Protesi fissa',c:isFissa},{l:'Protesi mobile / rimovibile',c:isMobile}],[{l:'Apparecchio ortodontico',c:isOrto},{l:'Dispositivo stampato in 3D',c:is3D}]];
+  checks.forEach(row=>{
+    row.forEach((item,ci)=>{
+      const x=ci===0?lm:lm+90, cy=y-1;
+      doc.setLineWidth(0.4); doc.setDrawColor(0);
+      doc.rect(x,cy,bs,bs);
+      if(item.c){
+        doc.setLineWidth(1.2); doc.setDrawColor(26,107,74);
+        doc.line(x+0.7,cy+bs/2+0.5,x+bs/2,cy+bs-0.7);
+        doc.line(x+bs/2,cy+bs-0.7,x+bs+0.6,cy-0.3);
+        doc.setLineWidth(0.4); doc.setDrawColor(0);
+      }
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(0);
+      doc.text(item.l, x+bs+2, y+2.8);
+    });
+    y+=8;
+  });
+
+  doc.text('Denominazione dispositivo: '+den, lm, y); y+=4.5;
+  doc.text('Codice / matricola: '+matricola, lm, y); y+=4.5;
+  doc.text('Materiali principali: '+mat, lm, y); y+=4.5;
+  doc.text('Fornitore materiali: '+fornitore, lm, y); y+=4.5;
+  doc.text('Tecnica di fabbricazione: '+tecnica, lm, y); y+=6;
+
+  // ── SEZ 4: DICHIARAZIONE
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(26,107,74);
+  doc.text('4. DICHIARAZIONE DI CONFORMITÀ', lm, y); y+=5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(0);
+  const t4=`Il sottoscritto, in qualità di fabbricante del dispositivo medico su misura sopra descritto, dichiara sotto la propria responsabilità che il dispositivo è stato progettato e fabbricato in conformità ai requisiti generali di sicurezza e prestazione di cui all'allegato I del Regolamento (UE) 2017/745 e alle prescrizioni dell'allegato XIII – Procedura per i dispositivi su misura. Il dispositivo è destinato esclusivamente al paziente indicato al punto 2.`;
+  const l4=doc.splitTextToSize(t4,cw);
+  doc.text(l4,lm,y); y+=l4.length*4.5+3;
+
+  doc.setFont('helvetica','italic'); doc.setFontSize(8.5); doc.setTextColor(40);
+  ['✔ Regolamento (UE) 2017/745 (MDR) – Allegato I e Allegato XIII',
+   '✔ D.Lgs. 137/2022 (recepimento MDR in Italia)',
+   '✔ UNI EN ISO 13485:2016 (Sistema di gestione per la qualità – ove applicabile)',
+   '✔ Norme armonizzate applicabili al materiale/processo utilizzato'].forEach(r=>{
+    doc.text(r,lm+4,y); y+=4.5;
+  });
+  doc.setFont('helvetica','normal'); doc.setTextColor(0); y+=2;
+
+  // ── SEZ 5: ANALISI RISCHI (su seconda pagina se poco spazio)
+  if(y>220){ doc.addPage(); y=14; }
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(26,107,74);
+  doc.text('5. ANALISI DEI RISCHI E CONTROLLO DEL PROCESSO', lm, y); y+=5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(0);
+
+  function drawCheck(x,cy,checked){
+    doc.setLineWidth(0.4); doc.setDrawColor(0);
+    doc.rect(x,cy,3.5,3.5);
+    if(checked){
+      doc.setLineWidth(1); doc.setDrawColor(26,107,74);
+      doc.line(x+0.5,cy+1.8,x+1.5,cy+2.8);
+      doc.line(x+1.5,cy+2.8,x+3.8,cy-0.2);
+      doc.setLineWidth(0.4); doc.setDrawColor(0);
+    }
+  }
+
+  const rischiItems=[
+    {l:'Analisi dei rischi effettuata',c:rRischi},
+    {l:'Controllo processo fabbricazione',c:rProcesso},
+    {l:'Rintracciabilità materiali garantita',c:rRintracciabile},
+    {l:'Rischi residui comunicati al medico',c:rComunicati},
+    {l:'Documentazione tecnica conservata per 10 anni dalla data di consegna',c:rArchivio}
+  ];
+  rischiItems.forEach(item=>{
+    drawCheck(lm, y-2.8, item.c);
+    doc.text(item.l, lm+5.5, y); y+=5.5;
+  });
+  y+=2;
+
+  // ── SEZ 6: AVVERTENZE
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(26,107,74);
+  doc.text('6. AVVERTENZE E ISTRUZIONI D\'USO PER IL PAZIENTE', lm, y); y+=5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(0);
+  ['1. Mantenere un\'igiene orale accurata per garantire la durata e la sicurezza del dispositivo.',
+   '2. Evitare utilizzi impropri (masticare oggetti duri, strappare nastri adesivi, ecc.).',
+   '3. In caso di dolore, instabilità o rottura del dispositivo, contattare il medico prescrittore.',
+   '4. Sottoporsi a controlli periodici (almeno annuali) per verificare lo stato del dispositivo.',
+   '5. Il dispositivo è realizzato su misura: non è trasferibile ad altri pazienti.',
+   '6. Conservare le istruzioni d\'uso per tutta la durata del dispositivo.'].forEach(r=>{
+    doc.text(r, lm, y); y+=4.8;
+  });
+  y+=3;
+
+  // ── SEZ 7: FIRMA
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(26,107,74);
+  doc.text('7. LUOGO, DATA E FIRMA', lm, y); y+=5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(0);
+  doc.text('Nome e Cognome: '+tec, lm, y); y+=6;
+  doc.text('Luogo e Data: '+(luogo||lab)+', '+dat, lm, y); y+=8;
+  doc.text('Firma: _________________________________________', lm, y); y+=10;
+
+  // Footer
+  doc.setLineWidth(0.3); doc.setDrawColor(180);
+  doc.line(lm, y, rm, y); y+=4;
+  doc.setFontSize(7); doc.setTextColor(100);
+  const footer='Questa dichiarazione è redatta in 3 copie originali: 1 conservata dal laboratorio • 1 consegnata al medico prescrittore • 1 consegnata al paziente';
+  doc.text(footer, W/2, y, {align:'center', maxWidth:cw}); y+=4;
+  doc.text('La documentazione tecnica è conservata per 10 anni dalla data di consegna (art. 10, par. 8, Reg. UE 2017/745)', W/2, y, {align:'center', maxWidth:cw}); y+=5;
+  doc.setTextColor(120);
+  doc.text('⚠ Documento generato tramite software di supporto. La responsabilità della conformità rimane in capo al laboratorio firmatario.', W/2, y, {align:'center', maxWidth:cw});
+
+  const filename='DichiarazioneConformita_'+num+'_'+anno+'_'+(cod||den||'MDR')+'.pdf';
+  doc.save(filename.replace(/\s+/g,'_'));
+  // Incrementa contatore progressivo
+  incrementaDichCounter();
+  toast('✅ Dichiarazione generata!');
+}
+
+function precompilaDich(){
+  // Numero progressivo persistente (non si resetta mai)
+  const nextNum = (DB.getObj('dich_counter').n || 0) + 1;
+  document.getElementById('d-data').value=today();
+  document.getElementById('d-datapres').value=today();
+  document.getElementById('d-numero').value=String(nextNum).padStart(3,'0');
+  document.getElementById('d-anno').value=new Date().getFullYear();
+  alert('✅ Dati precompilati! Completa i campi del paziente e del dispositivo.');
+}
+
+function incrementaDichCounter(){
+  const c = DB.getObj('dich_counter');
+  c.n = (c.n||0)+1;
+  DB.setObj('dich_counter', c);
+}
+
+function caricaDaLavoro() {
+  const lavori = DB.get('lavori');
+  const sel = document.getElementById('carica-sel');
+  sel.innerHTML = lavori.map(l=>`<option value="${l.id}">${l.paziente} — ${l.tipo} (${fmtDate(l.scadenza)})</option>`).join('');
+  document.getElementById('modal-carica').classList.add('open');
+}
+
+function applicaLavoro() {
+  const id = document.getElementById('carica-sel').value;
+  closeModal('carica');
+  prefillDich(id);
+}
+
+// ══════════════════════════════════════
+// FATTURE
+// ══════════════════════════════════════
+function renderFatture() {
+  const q = (document.getElementById('fatture-search')?.value||'').toLowerCase().trim();
+  let fatture = DB.get('fatture');
+  if (q) fatture = fatture.filter(f =>
+    (f.studio||'').toLowerCase().includes(q) ||
+    (f.desc||'').toLowerCase().includes(q)
+  );
+  const stMap = {Pagata:'verde','In attesa':'giallo',Scaduta:'rosso'};
+  document.getElementById('fatture-tbody').innerHTML = fatture.length ? fatture.map((f,i)=>`
+    <tr><td style="font-size:.75rem;color:var(--muted)">${new Date().getFullYear()}/${String(i+1).padStart(3,'0')}</td>
+    <td>${f.studio}</td><td>${fmtDate(f.data)}</td>
+    <td><strong>€ ${(+f.importo||0).toFixed(2)}</strong></td>
+    <td><span class="badge ${stMap[f.stato]||'grigio'}">${f.stato}</span></td>
+    <td><button class="action-btn" onclick="delFattura(${i})">🗑</button></td></tr>`).join('')
+    : emptyState(q ? `Nessun risultato per "${q}"` : '🧾 Nessuna fattura ancora — clicca "+ Nuova fattura"');
+}
+
+function saveFattura() {
+  const stu = document.getElementById('fat-studio').value.trim();
+  if (!validateField('fat-studio', stu)) { toast('Inserisci lo studio', 'error'); return; }
+  const fatture = DB.get('fatture');
+  fatture.push({studio:stu,data:document.getElementById('fat-data').value,importo:document.getElementById('fat-importo').value,stato:document.getElementById('fat-stato').value,desc:document.getElementById('fat-desc').value});
+  DB.set('fatture',fatture);
+  closeModal('fattura');
+  toast('✅ Fattura salvata!');
+  renderFatture();
+  renderDashboard();
+}
+function delFattura(i) {
+  if (!confirm('Eliminare questa fattura?')) return;
+  const f = DB.get('fatture'); f.splice(i,1); DB.set('fatture',f);
+  toast('🗑 Fattura eliminata', 'warn');
+  renderFatture();
+  renderDashboard();
+}
+
+// ══════════════════════════════════════
+// CHAT AI
+// ══════════════════════════════════════
+function autoH(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,90)+'px'}
+function chatKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat()}}
+function sendSugg(btn){document.getElementById('chat-inp').value=btn.textContent;sendChat()}
+
+function appendMsg(role,text){
+  const c=document.getElementById('chat-msgs');
+  const typing=document.getElementById('typing');
+  const d=document.createElement('div');
+  d.className='msg '+role;
+  d.innerHTML=`<div class="msg-av">${role==='user'?'Tu':'AI'}</div><div><div class="msg-bub">${text.replace(/\n/g,'<br>')}</div><div class="msg-t">${new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}</div></div>`;
+  c.insertBefore(d,typing);
+  c.scrollTop=c.scrollHeight;
+}
+
+async function sendChat(){
+  const inp=document.getElementById('chat-inp');
+  const btn=document.getElementById('send-btn');
+  const text=inp.value.trim();
+  if(!text||chatLoading)return;
+  if(!settings.apikey||!settings.apikey.startsWith('sk-')){
+    appendMsg('ai','⚙️ API Key non configurata. Vai in <strong>Impostazioni → API Key Anthropic</strong>, incolla la tua chiave e salva. Poi torna qui!');
+    return;
+  }
+  chatLoading=true;inp.value='';inp.style.height='auto';btn.disabled=true;
+  appendMsg('user',text);
+  chatHistory.push({role:'user',content:text});
+  const typing=document.getElementById('typing');
+  typing.classList.add('show');
+  document.getElementById('chat-msgs').scrollTop=9999;
+  try {
+    const res = await fetch('/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        apiKey: settings.apikey,
+        system: `Sei l'assistente AI di DentaLab, software gestionale italiano per laboratori odontotecnici.
+Conosci perfettamente: normativa MDR 2017/745, dichiarazioni di conformità, fatturazione elettronica, gestione materiali, CAD/CAM dentale, stampa 3D dentale.
+Rispondi sempre in italiano, in modo chiaro, pratico e conciso.`,
+        messages: chatHistory
+      })
+    });
+    const data = await res.json();
+    const reply = data.text || data.error || 'Nessuna risposta.';
+    chatHistory.push({role:'assistant',content:reply});
+    typing.classList.remove('show');
+    appendMsg('ai',reply);
+  } catch(err){
+    typing.classList.remove('show');
+    appendMsg('ai','⚠️ Errore di connessione. Controlla la tua API key nelle impostazioni.');
+  }
+  chatLoading=false;btn.disabled=false;inp.focus();
+}
+
+// ══════════════════════════════════════
+// IMPOSTAZIONI
+// ══════════════════════════════════════
+function loadSettingsForm(){
+  ['labname','tecnico','indirizzo','luogo','tel','email','piva','minsalute','apikey','gcal'].forEach(k=>{
+    const el=document.getElementById('cfg-'+k);
+    if(el)el.value=settings[k]||'';
+  });
+  const cb=document.getElementById('cfg-gcal-enabled');
+  if(cb)cb.checked=!!settings.gcalEnabled;
+}
+function saveSettings(){
+  ['labname','tecnico','indirizzo','luogo','tel','email','piva','minsalute','gcal'].forEach(k=>{
+    const el=document.getElementById('cfg-'+k);
+    if(el)settings[k]=el.value.trim();
+  });
+  const cb=document.getElementById('cfg-gcal-enabled');
+  if(cb) settings.gcalEnabled=cb.checked;
+  const newPin = document.getElementById('cfg-pin')?.value.trim();
+  if (newPin && newPin.length === 4) settings.pin = newPin;
+  const ak=document.getElementById('cfg-apikey').value.trim();
+  if(ak)settings.apikey=ak;
+  DB.setObj('settings',settings);
+  updateApiPill();
+  if(settings.gcalEnabled) { /* non triggerare auth al salvataggio */ }
+  alert('✅ Impostazioni salvate!');
+}
+function resetApp(){
+  if(!confirm('⚠️ Sei sicuro? Tutti i dati verranno eliminati definitivamente.'))return;
+  if(!confirm('Ultima conferma: eliminare TUTTI i dati?'))return;
+  localStorage.clear();
+  location.reload();
+}
+
+// ══════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════
+function today(){return new Date().toISOString().split('T')[0]}
+function fmtDate(d){if(!d)return'—';const[y,m,g]=d.split('-');return`${g}/${m}/${y}`}
+function fmtDateShort(d){if(!d)return'';const[,m,g]=d.split('-');return`${g}/${m}`}
+function badgeSt(s){const m={Completato:'verde','In corso':'giallo',Urgente:'rosso','In attesa':'grigio'};return`<span class="badge ${m[s]||'grigio'}">${s}</span>`}
+function getWeekDays(){
+  const d=new Date();
+  const day=d.getDay();
+  const mon=new Date(d);
+  mon.setDate(d.getDate()-(day===0?6:day-1));
+  return Array.from({length:7},(_,i)=>{const x=new Date(mon);x.setDate(mon.getDate()+i);return x.toISOString().split('T')[0]});
+}
+
+// ══════════════════════════════════════
+// FAB
+// ══════════════════════════════════════
+function toggleFab(){
+  const menu=document.getElementById('fab-menu');
+  const btn=document.getElementById('fab-main');
+  menu.classList.toggle('open');
+  btn.classList.toggle('open');
+}
+
+// ══════════════════════════════════════
+// VOICE INPUT
+// ══════════════════════════════════════
+let recognition=null;
+let voiceParsed=null;
+let isListening=false;
+
+function openVoice(){
+  toggleFab();
+  document.getElementById('voice-transcript').textContent='Il testo apparirà qui...';
+  document.getElementById('voice-result').classList.remove('show');
+  document.getElementById('voice-confirm').style.display='none';
+  document.getElementById('voice-status').textContent='Premi per iniziare';
+  document.getElementById('voice-circle').className='voice-circle';
+  voiceParsed=null;
+  document.getElementById('modal-voice').classList.add('open');
+}
+
+function toggleVoice(){
+  if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){
+    alert('Il tuo browser non supporta il riconoscimento vocale. Usa Chrome o Safari.');return;
+  }
+  if(isListening){ stopVoice(); return; }
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  recognition=new SR();
+  recognition.lang='it-IT';
+  recognition.continuous=true;
+  recognition.interimResults=true;
+  recognition.onstart=()=>{
+    isListening=true;
+    document.getElementById('voice-circle').className='voice-circle listening';
+    document.getElementById('voice-circle').textContent='⏹';
+    document.getElementById('voice-status').textContent='🔴 In ascolto... premi di nuovo per fermare';
+  };
+  recognition.onresult=(e)=>{
+    const transcript=Array.from(e.results).map(r=>r[0].transcript).join(' ');
+    document.getElementById('voice-transcript').textContent=transcript;
+  };
+  recognition.onend=()=>{
+    isListening=false;
+    document.getElementById('voice-circle').className='voice-circle';
+    document.getElementById('voice-circle').textContent='🎤';
+    document.getElementById('voice-status').textContent='✅ Registrazione completata — analizzo...';
+    const text=document.getElementById('voice-transcript').textContent;
+    if(text&&text!=='Il testo apparirà qui...')parseVoiceWithAI(text);
+    else document.getElementById('voice-status').textContent='Nessun testo rilevato. Riprova.';
+  };
+  recognition.onerror=(e)=>{
+    isListening=false;
+    document.getElementById('voice-circle').className='voice-circle';
+    document.getElementById('voice-circle').textContent='🎤';
+    document.getElementById('voice-status').textContent='⚠️ Errore microfono: '+e.error;
+  };
+  recognition.start();
+}
+
+function stopVoice(){
+  isListening=false;
+  if(recognition){ recognition.stop(); recognition=null; }
+  document.getElementById('voice-circle').className='voice-circle';
+  document.getElementById('voice-circle').textContent='🎤';
+}
+
+async function parseVoiceWithAI(text){
+  document.getElementById('voice-status').textContent='🔍 L\'AI sta analizzando...';
+  if(!settings.apikey||!settings.apikey.startsWith('sk-')){
+    voiceParsed={paziente:text,tipo:'Protesi fissa',stato:'In attesa',scadenza:today()};
+    showVoiceParsed();return;
+  }
+  try{
+    const raw = await callAI(`Sei un assistente per laboratori odontotecnici. Estrai i dati da questo comando vocale e rispondi SOLO con JSON valido, nessun testo extra, nessun markdown.
+
+Comando vocale: "${text}"
+
+Regole: "paziente"=nome cognome, "dottore"=cognome medico, "denominazione"=descrizione lavoro (es. "corona 14"), "materiale"=materiale usato, "tipo"=uno tra "Protesi fissa"/"Protesi mobile / rimovibile"/"Apparecchio ortodontico"/"Dispositivo stampato in 3D"/"Altro", "scadenza"=YYYY-MM-DD rispetto ad oggi ${today()}, "stato"=uno tra "In attesa"/"In corso"/"Urgente"/"Completato"
+JSON: {"paziente":"","dottore":"","studio":"","tipo":"Protesi fissa","denominazione":"","materiale":"","scadenza":"","stato":"In attesa","note":""}`);
+    voiceParsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
+    showVoiceParsed();
+  }catch(e){
+    voiceParsed={paziente:text,tipo:'Protesi fissa',stato:'In attesa',scadenza:today()};
+    showVoiceParsed();
+  }
+}
+
+function showVoiceParsed(){
+  if(!voiceParsed)return;
+  const p=voiceParsed;
+  document.getElementById('voice-parsed').innerHTML=`
+    ${p.paziente?`<div><strong>Paziente:</strong> ${p.paziente}</div>`:''}
+    ${p.dottore?`<div><strong>Medico:</strong> ${p.dottore}</div>`:''}
+    ${p.tipo?`<div><strong>Tipo:</strong> ${p.tipo}</div>`:''}
+    ${p.denominazione?`<div><strong>Denominazione:</strong> ${p.denominazione}</div>`:''}
+    ${p.materiale?`<div><strong>Materiale:</strong> ${p.materiale}</div>`:''}
+    ${p.scadenza?`<div><strong>Scadenza:</strong> ${fmtDate(p.scadenza)}</div>`:''}
+    ${p.stato?`<div><strong>Stato:</strong> ${p.stato}</div>`:''}`;
+  document.getElementById('voice-result').classList.add('show');
+  document.getElementById('voice-confirm').style.display='inline-block';
+  document.getElementById('voice-status').textContent='✅ Dati rilevati — conferma per salvare';
+}
+
+function confirmVoice(){
+  if(!voiceParsed)return;
+  closeModal('voice');
+  // Fill form and open modal
+  editingLavId=null;
+  document.getElementById('modal-lavoro-title').textContent='Nuovo lavoro (da voce)';
+  document.getElementById('lav-paziente').value=voiceParsed.paziente||'';
+  document.getElementById('lav-dottore').value=voiceParsed.dottore||'';
+  document.getElementById('lav-studio').value=voiceParsed.studio||'';
+  document.getElementById('lav-tipo').value=voiceParsed.tipo||'Protesi fissa';
+  document.getElementById('lav-stato').value=voiceParsed.stato||'In attesa';
+  document.getElementById('lav-denom').value=voiceParsed.denominazione||'';
+  document.getElementById('lav-materiale').value=voiceParsed.materiale||'';
+  document.getElementById('lav-scadenza').value=voiceParsed.scadenza||'';
+  document.getElementById('lav-datapres').value=today();
+  document.getElementById('lav-note').value=voiceParsed.note||'';
+  document.getElementById('modal-lavoro').classList.add('open');
+}
+
+// ══════════════════════════════════════
+// PHOTO PRESCRIPTION
+// ══════════════════════════════════════
+let photoParsed=null;
+let photoBase64=null;
+
+function openPhoto(){
+  toggleFab();
+  document.getElementById('photo-preview-img').style.display='none';
+  document.getElementById('photo-placeholder').style.display='block';
+  document.getElementById('photo-analyzing').classList.remove('show');
+  document.getElementById('photo-result').classList.remove('show');
+  document.getElementById('photo-confirm').style.display='none';
+  photoParsed=null;photoBase64=null;
+  document.getElementById('modal-photo').classList.add('open');
+}
+
+function handlePhotoUpload(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=(ev)=>{
+    photoBase64=ev.target.result.split(',')[1];
+    const img=document.getElementById('photo-preview-img');
+    img.src=ev.target.result;img.style.display='block';
+    document.getElementById('photo-placeholder').style.display='none';
+    analyzePhoto();
+  };
+  reader.readAsDataURL(file);
+}
+
+async function analyzePhoto(){
+  document.getElementById('photo-analyzing').classList.add('show');
+  document.getElementById('photo-result').classList.remove('show');
+  if(!settings.apikey||!settings.apikey.startsWith('sk-')){
+    document.getElementById('photo-analyzing').classList.remove('show');
+    alert('Configura la API Key nelle impostazioni per usare questa funzione.');return;
+  }
+  try{
+    const raw = await callAI(`Analizza questa prescrizione odontotecnica ed estrai i dati. Rispondi SOLO con JSON valido senza markdown:
+{"paziente":"","dottore":"","studio":"","tipo":"Protesi fissa","denominazione":"","materiale":"","note":""}
+Tipi validi: "Protesi fissa","Protesi mobile / rimovibile","Apparecchio ortodontico","Dispositivo stampato in 3D","Altro"
+Se non riesci a leggere un campo lascia stringa vuota.`, photoBase64);
+    photoParsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
+    document.getElementById('photo-analyzing').classList.remove('show');
+    document.getElementById('photo-parsed').innerHTML=Object.entries(photoParsed)
+      .filter(([,v])=>v).map(([k,v])=>`<div><strong>${k}:</strong> ${v}</div>`).join('');
+    document.getElementById('photo-result').classList.add('show');
+    document.getElementById('photo-confirm').style.display='inline-block';
+  }catch(e){
+    document.getElementById('photo-analyzing').classList.remove('show');
+    alert('Errore nell\'analisi. Riprova con una foto più nitida.');
+  }
+}
+
+function confirmPhoto(){
+  if(!photoParsed)return;
+  closeModal('photo');
+  editingLavId=null;
+  document.getElementById('modal-lavoro-title').textContent='Nuovo lavoro (da foto)';
+  document.getElementById('lav-paziente').value=photoParsed.paziente||'';
+  document.getElementById('lav-dottore').value=photoParsed.dottore||'';
+  document.getElementById('lav-studio').value=photoParsed.studio||'';
+  document.getElementById('lav-tipo').value=photoParsed.tipo||'Protesi fissa';
+  document.getElementById('lav-stato').value='In attesa';
+  document.getElementById('lav-denom').value=photoParsed.denominazione||'';
+  document.getElementById('lav-materiale').value=photoParsed.materiale||'';
+  document.getElementById('lav-scadenza').value='';
+  document.getElementById('lav-datapres').value=today();
+  document.getElementById('lav-note').value=photoParsed.note||'';
+  document.getElementById('modal-lavoro').classList.add('open');
+}
+
+// ══════════════════════════════════════
+// TEMPLATES
+// ══════════════════════════════════════
+function openTemplates(){
+  toggleFab();
+  renderTemplates();
+  document.getElementById('modal-template').classList.add('open');
+}
+
+function renderTemplates(){
+  const tpls=DB.get('templates');
+  const grid=document.getElementById('tpl-grid');
+  const empty=document.getElementById('tpl-empty');
+  if(!tpls.length){grid.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  grid.innerHTML=tpls.map((t,i)=>`
+    <div class="tpl-card" onclick="applyTemplate(${i})">
+      <button class="tpl-del" onclick="event.stopPropagation();delTemplate(${i})">×</button>
+      <div class="tpl-name">${t.nome||t.tipo}</div>
+      <div class="tpl-detail">${t.tipo}</div>
+      ${t.materiale?`<div class="tpl-detail">${t.materiale}</div>`:''}
+      ${t.dottore?`<div class="tpl-detail">Dr. ${t.dottore}</div>`:''}
+    </div>`).join('');
+}
+
+function applyTemplate(i){
+  const t=DB.get('templates')[i];
+  if(!t)return;
+  closeModal('template');
+  editingLavId=null;
+  document.getElementById('modal-lavoro-title').textContent='Nuovo lavoro (da template)';
+  document.getElementById('lav-paziente').value='';
+  document.getElementById('lav-dottore').value=t.dottore||'';
+  document.getElementById('lav-studio').value=t.studio||'';
+  document.getElementById('lav-tipo').value=t.tipo||'Protesi fissa';
+  document.getElementById('lav-stato').value='In attesa';
+  document.getElementById('lav-denom').value=t.denominazione||'';
+  document.getElementById('lav-materiale').value=t.materiale||'';
+  document.getElementById('lav-scadenza').value='';
+  document.getElementById('lav-datapres').value=today();
+  document.getElementById('lav-note').value=t.note||'';
+  document.getElementById('modal-lavoro').classList.add('open');
+}
+
+function saveCurrentAsTemplate(){
+  const tipo=document.getElementById('lav-tipo')?.value||'Protesi fissa';
+  const mat=document.getElementById('lav-materiale')?.value||'';
+  const doc=document.getElementById('lav-dottore')?.value||'';
+  const nome=prompt('Nome del template:',tipo+(mat?' - '+mat:''));
+  if(!nome)return;
+  const tpls=DB.get('templates');
+  tpls.push({nome,tipo,materiale:mat,dottore:doc,studio:document.getElementById('lav-studio')?.value||'',denominazione:document.getElementById('lav-denom')?.value||''});
+  DB.set('templates',tpls);
+  renderTemplates();
+  alert('✅ Template salvato!');
+}
+
+function delTemplate(i){
+  if(!confirm('Eliminare questo template?'))return;
+  const tpls=DB.get('templates');tpls.splice(i,1);DB.set('templates',tpls);renderTemplates();
+}
+
+// ══════════════════════════════════════
+// DUPLICA LAVORO
+// ══════════════════════════════════════
+function duplicaLavoro(id){
+  const l=DB.get('lavori').find(x=>x.id==id);
+  if(!l)return;
+  editingLavId=null;
+  document.getElementById('modal-lavoro-title').textContent='Duplica lavoro';
+  document.getElementById('lav-paziente').value='';
+  document.getElementById('lav-dottore').value=l.dottore||'';
+  document.getElementById('lav-studio').value=l.studio||'';
+  document.getElementById('lav-tipo').value=l.tipo||'Protesi fissa';
+  document.getElementById('lav-stato').value='In attesa';
+  document.getElementById('lav-denom').value=l.denominazione||'';
+  document.getElementById('lav-materiale').value=l.materiale||'';
+  document.getElementById('lav-scadenza').value='';
+  document.getElementById('lav-datapres').value=today();
+  document.getElementById('lav-note').value=l.note||'';
+  document.getElementById('modal-lavoro').classList.add('open');
+}
+
+// ══════════════════════════════════════
+// IMPORT CSV / EXCEL
+// ══════════════════════════════════════
+let importedRows=[];
+
+function openImport(){
+  toggleFab();
+  importedRows=[];
+  document.getElementById('import-preview-wrap').style.display='none';
+  document.getElementById('import-confirm').style.display='none';
+  document.getElementById('import-file').value='';
+  document.getElementById('modal-import').classList.add('open');
+}
+
+function downloadCSVTemplate(){
+  const csv='paziente,dottore,studio,tipo,materiale,scadenza,stato\nRossi Mario,Dr. Bianchi,Studio Bianchi,Protesi fissa,Zirconia,2025-04-20,In attesa\nVerdi Anna,Dr.ssa Conti,,Protesi mobile / rimovibile,Resina,2025-04-22,In corso';
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='template_dentalab.csv';a.click();
+}
+
+function handleImport(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  const ext=file.name.split('.').pop().toLowerCase();
+  const reader=new FileReader();
+  if(ext==='csv'){
+    reader.onload=(ev)=>parseCSV(ev.target.result);
+    reader.readAsText(file,'UTF-8');
+  } else {
+    // Excel — basic: read as text and parse
+    reader.onload=(ev)=>{
+      // For xlsx we use a simple approach - try to parse as CSV fallback
+      alert('Per Excel, salva prima il file come CSV (File → Salva come → CSV). Poi importalo qui.');
+    };
+    reader.readAsBinaryString(file);
+  }
+}
+
+function parseCSV(text){
+  const lines=text.trim().split('\n').filter(l=>l.trim());
+  if(lines.length<2){alert('Il file deve avere almeno una riga di intestazione e una di dati.');return;}
+  const headers=lines[0].split(',').map(h=>h.trim().toLowerCase().replace(/\s+/g,''));
+  importedRows=lines.slice(1).map(line=>{
+    const vals=line.split(',').map(v=>v.trim().replace(/^"|"$/g,''));
+    const obj={};
+    headers.forEach((h,i)=>obj[h]=vals[i]||'');
+    return {
+      paziente:obj.paziente||obj['nomepaziente']||'',
+      dottore:obj.dottore||obj.medico||'',
+      studio:obj.studio||'',
+      tipo:obj.tipo||'Protesi fissa',
+      materiale:obj.materiale||'',
+      scadenza:obj.scadenza||'',
+      stato:obj.stato||'In attesa',
+      denominazione:obj.denominazione||obj.descrizione||''
+    };
+  }).filter(r=>r.paziente);
+
+  if(!importedRows.length){alert('Nessun dato valido trovato. Controlla che ci sia la colonna "paziente".');return;}
+
+  document.getElementById('import-count').textContent=`${importedRows.length} lavori trovati — anteprima:`;
+  document.getElementById('import-preview').innerHTML=`<table>
+    <tr><th>Paziente</th><th>Dottore</th><th>Tipo</th><th>Scadenza</th></tr>
+    ${importedRows.slice(0,5).map(r=>`<tr><td>${r.paziente}</td><td>${r.dottore}</td><td>${r.tipo}</td><td>${r.scadenza}</td></tr>`).join('')}
+    ${importedRows.length>5?`<tr><td colspan="4" style="color:var(--muted);text-align:center">... e altri ${importedRows.length-5}</td></tr>`:''}
+  </table>`;
+  document.getElementById('import-preview-wrap').style.display='block';
+  document.getElementById('import-confirm').style.display='inline-block';
+}
+
+function confirmImport(){
+  const lavori=DB.get('lavori');
+  const now=Date.now();
+  importedRows.forEach((r,i)=>{
+    lavori.push({id:now+i,creato:new Date().toISOString(),...r});
+  });
+  DB.set('lavori',lavori);
+  closeModal('import');
+  showPage('lavori');
+  alert(`✅ Importati ${importedRows.length} lavori!`);
+}
+
+// ══════════════════════════════════════
+// EXPORT EXCEL
+// ══════════════════════════════════════
+function esportaExcel(){
+  const wb = XLSX.utils.book_new();
+
+  // ── Foglio LAVORI
+  const lavori = DB.get('lavori');
+  const lavoriData = [
+    ['#','Paziente','Dottore','Studio','Tipo Dispositivo','Denominazione','Materiale','Data Prescrizione','Scadenza','Stato','Note','Creato'],
+    ...lavori.map(l=>[
+      l.id.toString().slice(-6),
+      l.paziente||'', l.dottore||'', l.studio||'',
+      l.tipo||'', l.denominazione||'', l.materiale||'',
+      l.datapres||'', l.scadenza||'', l.stato||'',
+      l.note||'', l.creato ? new Date(l.creato).toLocaleDateString('it-IT') : ''
+    ])
+  ];
+  const wsLavori = XLSX.utils.aoa_to_sheet(lavoriData);
+  wsLavori['!cols'] = [6,18,16,18,20,22,18,14,12,12,20,12].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, wsLavori, 'Lavori');
+
+  // ── Foglio MAGAZZINO
+  const mats = DB.get('materiali');
+  const matData = [
+    ['Nome Materiale','Quantità','Unità','Scorta Minima','Fornitore','Stato Scorta'],
+    ...mats.map(m=>[
+      m.nome||'', m.quantita||0, m.unita||'pz', m.minimo||2, m.fornitore||'',
+      m.quantita<=0 ? '🔴 Esaurito' : m.quantita<=m.minimo ? '🟡 Scorta bassa' : '🟢 OK'
+    ])
+  ];
+  const wsMat = XLSX.utils.aoa_to_sheet(matData);
+  wsMat['!cols'] = [22,10,10,14,18,14].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, wsMat, 'Magazzino');
+
+  // ── Foglio FATTURE
+  const fatture = DB.get('fatture');
+  const fatData = [
+    ['N°','Studio / Dottore','Data','Importo €','Descrizione','Stato'],
+    ...fatture.map((f,i)=>[
+      `${new Date().getFullYear()}/${String(i+1).padStart(3,'0')}`,
+      f.studio||'', f.data||'', parseFloat(f.importo||0).toFixed(2),
+      f.desc||'', f.stato||''
+    ])
+  ];
+  const wsFat = XLSX.utils.aoa_to_sheet(fatData);
+  wsFat['!cols'] = [10,22,12,12,24,12].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, wsFat, 'Fatture');
+
+  // ── Foglio RIEPILOGO
+  const oggi = today();
+  const attivi = lavori.filter(l=>l.stato!=='Completato').length;
+  const urgenti = lavori.filter(l=>l.scadenza===oggi||l.stato==='Urgente').length;
+  const completati = lavori.filter(l=>l.stato==='Completato').length;
+  const totFat = fatture.reduce((s,f)=>s+(+f.importo||0),0);
+  const matBasse = mats.filter(m=>m.quantita<=m.minimo).length;
+  const riepilogoData = [
+    ['RIEPILOGO DENTALAB — '+new Date().toLocaleDateString('it-IT'),''],
+    ['',''],
+    ['Laboratorio', settings.labname||''],
+    ['Odontotecnico', settings.tecnico||''],
+    ['Data export', new Date().toLocaleDateString('it-IT')],
+    ['',''],
+    ['LAVORI',''],
+    ['Lavori attivi', attivi],
+    ['Lavori urgenti oggi', urgenti],
+    ['Lavori completati', completati],
+    ['Totale lavori', lavori.length],
+    ['',''],
+    ['MAGAZZINO',''],
+    ['Materiali a scorta bassa', matBasse],
+    ['Totale materiali', mats.length],
+    ['',''],
+    ['FATTURE',''],
+    ['Totale fatturato €', totFat.toFixed(2)],
+    ['Fatture in attesa', fatture.filter(f=>f.stato==='In attesa').length],
+  ];
+  const wsRiep = XLSX.utils.aoa_to_sheet(riepilogoData);
+  wsRiep['!cols'] = [{wch:28},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, wsRiep, 'Riepilogo');
+
+  // Scarica
+  const filename = `DentaLab_${settings.labname||'registro'}_${oggi}.xlsx`.replace(/\s+/g,'_');
+  XLSX.writeFile(wb, filename);
+}
+
+// ══════════════════════════════════════
+// GOOGLE CALENDAR SYNC
+// ══════════════════════════════════════
+const GCAL_CLIENT_ID = '22607164127-lqrl6vh7jn7nr1khriqfnrm0f1ajq8pq.apps.googleusercontent.com';
+const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+let gcalToken = null;
+
+function getGcalToken(callback) {
+  if (gcalToken) { callback(gcalToken); return; }
+  if (!window.google) {
+    // Fallback: open Google Calendar manually
+    callback(null); return;
+  }
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GCAL_CLIENT_ID,
+    scope: GCAL_SCOPE,
+    callback: (resp) => {
+      if (resp.access_token) {
+        gcalToken = resp.access_token;
+        callback(gcalToken);
+      }
+    }
+  });
+  client.requestAccessToken();
+}
+
+async function syncToGoogleCalendar(lav) {
+  if (!settings.gcalEnabled) return;
+  getGcalToken(async (token) => {
+    if (!token) {
+      // Fallback silenzioso — nessun popup fastidioso
+      return;
+    }
+    try {
+      const d = lav.scadenza; // YYYY-MM-DD
+      const event = {
+        summary: `🦷 ${lav.paziente} — ${lav.tipo}`,
+        description: [
+          `Medico: ${lav.dottore}`,
+          lav.studio ? `Studio: ${lav.studio}` : '',
+          lav.denominazione ? `Lavoro: ${lav.denominazione}` : '',
+          lav.materiale ? `Materiale: ${lav.materiale}` : '',
+          `Stato: ${lav.stato}`,
+          lav.note ? `Note: ${lav.note}` : ''
+        ].filter(Boolean).join('\n'),
+        start: { date: d },
+        end: { date: d },
+        colorId: lav.stato === 'Urgente' ? '11' : lav.stato === 'In corso' ? '5' : '2',
+        reminders: {
+          useDefault: false,
+          overrides: [{ method: 'popup', minutes: 60 * 24 }] // 1 giorno prima
+        }
+      };
+      const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify(event)
+      });
+      if (res.ok) {
+        showGcalToast('✅ Aggiunto a Google Calendar!');
+      } else if (res.status === 401) {
+        gcalToken = null; // Token scaduto — resetta
+      }
+    } catch(e) { /* sync silenzioso */ }
+  });
+}
+
+function showGcalToast(msg) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1a6b4a;color:#fff;padding:10px 20px;border-radius:10px;font-size:.85rem;font-weight:700;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,.2)';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+function connectGoogleCalendar() {
+  if (!window.google) {
+    alert('Libreria Google non caricata. Ricarica la pagina e riprova.');
+    return;
+  }
+  document.getElementById('gcal-status').textContent = '⏳ Connessione in corso...';
+  getGcalToken((token) => {
+    if (token) {
+      document.getElementById('gcal-status').textContent = '✅ Google Calendar collegato!';
+      document.getElementById('gcal-status').style.color = 'var(--accent)';
+      showGcalToast('✅ Google Calendar collegato!');
+    } else {
+      document.getElementById('gcal-status').textContent = '❌ Connessione fallita. Controlla le impostazioni Google.';
+      document.getElementById('gcal-status').style.color = 'var(--danger)';
+    }
+  });
+}
+
+function initGoogleCalendar() {
+  if (gcalToken) {
+    const el = document.getElementById('gcal-status');
+    if (el) { el.textContent = '✅ Collegato'; el.style.color = 'var(--accent)'; }
+  }
+}
+
+let dichRecognition=null;
+let isDichListening=false;
+let dichParsed=null;
+
+function openDichVoice(){
+  dichParsed=null;
+  document.getElementById('dich-voice-transcript').textContent='Il testo apparirà qui...';
+  document.getElementById('dich-voice-result').classList.remove('show');
+  document.getElementById('dich-voice-confirm').style.display='none';
+  document.getElementById('dich-voice-status').textContent='Premi per iniziare';
+  document.getElementById('dich-voice-circle').className='voice-circle';
+  document.getElementById('dich-voice-circle').textContent='🎤';
+  document.getElementById('modal-dich-voice').classList.add('open');
+}
+
+function toggleDichVoice(){
+  if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){
+    alert('Usa Chrome o Safari per il riconoscimento vocale.');return;
+  }
+  if(isDichListening){stopDichVoice();return;}
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  dichRecognition=new SR();
+  dichRecognition.lang='it-IT';
+  dichRecognition.continuous=true;
+  dichRecognition.interimResults=true;
+  dichRecognition.onstart=()=>{
+    isDichListening=true;
+    document.getElementById('dich-voice-circle').className='voice-circle listening';
+    document.getElementById('dich-voice-circle').textContent='⏹';
+    document.getElementById('dich-voice-status').textContent='🔴 In ascolto... premi di nuovo per fermare';
+  };
+  dichRecognition.onresult=(e)=>{
+    const t=Array.from(e.results).map(r=>r[0].transcript).join(' ');
+    document.getElementById('dich-voice-transcript').textContent=t;
+  };
+  dichRecognition.onend=()=>{
+    isDichListening=false;
+    document.getElementById('dich-voice-circle').className='voice-circle';
+    document.getElementById('dich-voice-circle').textContent='🎤';
+    const text=document.getElementById('dich-voice-transcript').textContent;
+    if(text&&text!=='Il testo apparirà qui...')parseDichVoice(text);
+    else document.getElementById('dich-voice-status').textContent='Nessun testo. Riprova.';
+  };
+  dichRecognition.onerror=()=>{
+    isDichListening=false;
+    document.getElementById('dich-voice-circle').className='voice-circle';
+    document.getElementById('dich-voice-circle').textContent='🎤';
+  };
+  dichRecognition.start();
+}
+
+function stopDichVoice(){
+  isDichListening=false;
+  if(dichRecognition){dichRecognition.stop();dichRecognition=null;}
+}
+
+async function parseDichVoice(text){
+  document.getElementById('dich-voice-status').textContent='🔍 L\'AI sta analizzando...';
+  if(!settings.apikey||!settings.apikey.startsWith('sk-')){
+    alert('Configura la API Key nelle impostazioni.');return;
+  }
+  try{
+    const raw = await callAI(`Estrai i dati da questo testo vocale per una dichiarazione di conformità MDR 2017/745. Rispondi SOLO con JSON valido senza markdown.
+Testo: "${text}"
+JSON: {"codice":"","nascita":"","npres":"","medico":"","studio":"","datapres":"","tipo_fissa":false,"tipo_mobile":false,"tipo_orto":false,"tipo_3d":false,"denominazione":"","matricola":"","materiale":"","fornitore":"","tecnica":""}
+- nascita/datapres: YYYY-MM-DD rispetto a oggi ${today()}, tipo_*: true se menzionato, Se non menzionato: "" o false`);
+    dichParsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
+    showDichParsed('voice');
+  }catch(e){
+    document.getElementById('dich-voice-status').textContent='⚠️ Errore. Riprova.';
+  }
+}
+
+function showDichParsed(src){
+  const p=dichParsed; if(!p)return;
+  const elId=src==='voice'?'dich-voice-parsed':'dich-photo-parsed';
+  const resId=src==='voice'?'dich-voice-result':'dich-photo-result';
+  const btnId=src==='voice'?'dich-voice-confirm':'dich-photo-confirm';
+  document.getElementById(elId).innerHTML=`
+    ${p.medico?`<div><strong>Medico:</strong> ${p.medico}</div>`:''}
+    ${p.studio?`<div><strong>Studio:</strong> ${p.studio}</div>`:''}
+    ${p.nascita?`<div><strong>Data nascita:</strong> ${fmtDate(p.nascita)}</div>`:''}
+    ${p.datapres?`<div><strong>Data prescrizione:</strong> ${fmtDate(p.datapres)}</div>`:''}
+    ${(p.tipo_fissa||p.tipo_mobile||p.tipo_orto||p.tipo_3d)?`<div><strong>Tipo:</strong> ${[p.tipo_fissa&&'Protesi fissa',p.tipo_mobile&&'Mobile',p.tipo_orto&&'Ortodontico',p.tipo_3d&&'3D'].filter(Boolean).join(', ')}</div>`:''}
+    ${p.denominazione?`<div><strong>Denominazione:</strong> ${p.denominazione}</div>`:''}
+    ${p.materiale?`<div><strong>Materiale:</strong> ${p.materiale}</div>`:''}
+    ${p.tecnica?`<div><strong>Tecnica:</strong> ${p.tecnica}</div>`:''}`;
+  document.getElementById(resId).classList.add('show');
+  document.getElementById(btnId).style.display='inline-block';
+  if(src==='voice') document.getElementById('dich-voice-status').textContent='✅ Dati rilevati — conferma per compilare';
+}
+
+function applyDichParsed(){
+  const p=dichParsed; if(!p)return;
+  if(p.codice) document.getElementById('d-codice').value=p.codice;
+  if(p.nascita) document.getElementById('d-nascita').value=p.nascita;
+  if(p.npres) document.getElementById('d-npres').value=p.npres;
+  if(p.medico) document.getElementById('d-medico').value=p.medico;
+  if(p.studio) document.getElementById('d-studio').value=p.studio;
+  if(p.datapres) document.getElementById('d-datapres').value=p.datapres;
+  if(p.denominazione) document.getElementById('d-denom').value=p.denominazione;
+  if(p.matricola) document.getElementById('d-matricola').value=p.matricola;
+  if(p.materiale) document.getElementById('d-mat').value=p.materiale;
+  if(p.fornitore) document.getElementById('d-fornitore').value=p.fornitore;
+  if(p.tecnica) document.getElementById('d-tecnica').value=p.tecnica;
+  document.getElementById('d-fissa').checked=!!p.tipo_fissa;
+  document.getElementById('d-mobile').checked=!!p.tipo_mobile;
+  document.getElementById('d-orto').checked=!!p.tipo_orto;
+  document.getElementById('d-3d').checked=!!p.tipo_3d;
+  if(!document.getElementById('d-data').value) document.getElementById('d-data').value=today();
+  if(!document.getElementById('d-numero').value){
+    document.getElementById('d-numero').value=String(DB.get('lavori').length+1).padStart(3,'0');
+    document.getElementById('d-anno').value=new Date().getFullYear();
+  }
+}
+
+function confirmDichVoice(){ stopDichVoice(); applyDichParsed(); closeModal('dich-voice'); }
+
+// ══════════════════════════════════════
+// DICHIARAZIONE — FOTO
+// ══════════════════════════════════════
+let dichPhotoBase64=null;
+
+function openDichPhoto(){
+  dichParsed=null; dichPhotoBase64=null;
+  document.getElementById('dich-photo-img').style.display='none';
+  document.getElementById('dich-photo-placeholder').style.display='block';
+  document.getElementById('dich-photo-analyzing').classList.remove('show');
+  document.getElementById('dich-photo-result').classList.remove('show');
+  document.getElementById('dich-photo-confirm').style.display='none';
+  document.getElementById('dich-photo-file').value='';
+  document.getElementById('modal-dich-photo').classList.add('open');
+}
+
+function handleDichPhoto(e){
+  const file=e.target.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=(ev)=>{
+    dichPhotoBase64=ev.target.result.split(',')[1];
+    const img=document.getElementById('dich-photo-img');
+    img.src=ev.target.result; img.style.display='block';
+    document.getElementById('dich-photo-placeholder').style.display='none';
+    analyzeDichPhoto();
+  };
+  reader.readAsDataURL(file);
+}
+
+async function analyzeDichPhoto(){
+  document.getElementById('dich-photo-analyzing').classList.add('show');
+  document.getElementById('dich-photo-result').classList.remove('show');
+  if(!settings.apikey||!settings.apikey.startsWith('sk-')){
+    document.getElementById('dich-photo-analyzing').classList.remove('show');
+    alert('Configura la API Key nelle impostazioni.');return;
+  }
+  try{
+    const raw = await callAI(`Analizza questa prescrizione odontotecnica ed estrai i dati. Rispondi SOLO con JSON valido senza markdown.
+JSON: {"codice":"","nascita":"","npres":"","medico":"","studio":"","datapres":"","tipo_fissa":false,"tipo_mobile":false,"tipo_orto":false,"tipo_3d":false,"denominazione":"","matricola":"","materiale":"","fornitore":"","tecnica":""}
+Date in formato YYYY-MM-DD. Se non leggibile lascia stringa vuota o false.`, dichPhotoBase64);
+    dichParsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
+    document.getElementById('dich-photo-analyzing').classList.remove('show');
+    showDichParsed('photo');
+  }catch(e){
+    document.getElementById('dich-photo-analyzing').classList.remove('show');
+    alert('Errore nell\'analisi. Riprova con foto più nitida.');
+  }
+}
+
+function confirmDichPhoto(){ applyDichParsed(); closeModal('dich-photo'); }
+
+let newWorker = null;
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      newWorker = reg.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          // New version ready — show banner
+          document.getElementById('update-banner').classList.add('show');
+        }
+      });
+    });
+  });
+
+  // When SW takes over, reload
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!refreshing) { refreshing = true; window.location.reload(); }
+  });
+}
+
+function applyUpdate() {
+  if (newWorker) newWorker.postMessage('skipWaiting');
+  else window.location.reload();
+}
+
+document.querySelectorAll('.modal-overlay').forEach(o=>{
+  o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('open'); });
+});
+</script>
+</body>
+</html>
