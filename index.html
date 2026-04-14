@@ -360,7 +360,7 @@ tr:hover td{background:rgba(26,107,74,.03)}
     <div class="topbar">
       <div class="topbar-title" id="pageTitle">Dashboard</div>
       <div class="topbar-right">
-        <div class="api-pill err" id="apiPill"><span class="led r" id="apiLed"></span><span id="apiTxt">API non configurata</span></div>
+        <div class="api-pill ok" id="apiPill"><span class="led g" id="apiLed"></span><span id="apiTxt">AI Connessa</span></div>
       </div>
     </div>
 
@@ -896,10 +896,9 @@ function showPage(page) {
 }
 
 function updateApiPill() {
-  const has = settings.apikey && settings.apikey.startsWith('sk-');
-  document.getElementById('apiPill').className = 'api-pill '+(has?'ok':'err');
-  document.getElementById('apiLed').className = 'led '+(has?'g':'r');
-  document.getElementById('apiTxt').textContent = has ? 'AI Connessa' : 'API non configurata';
+  document.getElementById('apiPill').className = 'api-pill ok';
+  document.getElementById('apiLed').className = 'led g';
+  document.getElementById('apiTxt').textContent = 'AI Connessa';
 }
 
 // ══════════════════════════════════════
@@ -1103,7 +1102,7 @@ async function callAI(prompt, imageBase64=null) {
   const res = await fetch('/claude', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({apiKey:settings.apikey, messages})
+    body:JSON.stringify({messages})
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error);
@@ -1695,10 +1694,6 @@ async function sendChat(){
   const btn=document.getElementById('send-btn');
   const text=inp.value.trim();
   if(!text||chatLoading)return;
-  if(!settings.apikey||!settings.apikey.startsWith('sk-')){
-    appendMsg('ai','⚙️ API Key non configurata. Vai in <strong>Impostazioni → API Key Anthropic</strong>, incolla la tua chiave e salva. Poi torna qui!');
-    return;
-  }
   chatLoading=true;inp.value='';inp.style.height='auto';btn.disabled=true;
   appendMsg('user',text);
   chatHistory.push({role:'user',content:text});
@@ -1710,7 +1705,7 @@ async function sendChat(){
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        apiKey: settings.apikey,
+        
         system: `Sei l'assistente AI di DentaLab, software gestionale italiano per laboratori odontotecnici.
 Conosci perfettamente: normativa MDR 2017/745, dichiarazioni di conformità, fatturazione elettronica, gestione materiali, CAD/CAM dentale, stampa 3D dentale.
 Rispondi sempre in italiano, in modo chiaro, pratico e conciso.`,
@@ -1853,9 +1848,6 @@ function stopVoice(){
 
 async function parseVoiceWithAI(text){
   document.getElementById('voice-status').textContent='🔍 L\'AI sta analizzando...';
-  if(!settings.apikey||!settings.apikey.startsWith('sk-')){
-    voiceParsed={paziente:text,tipo:'Protesi fissa',stato:'In attesa',scadenza:today()};
-    showVoiceParsed();return;
   }
   try{
     const raw = await callAI(`Sei un assistente per laboratori odontotecnici. Estrai i dati da questo comando vocale e rispondi SOLO con JSON valido, nessun testo extra, nessun markdown.
@@ -1941,9 +1933,6 @@ function handlePhotoUpload(e){
 async function analyzePhoto(){
   document.getElementById('photo-analyzing').classList.add('show');
   document.getElementById('photo-result').classList.remove('show');
-  if(!settings.apikey||!settings.apikey.startsWith('sk-')){
-    document.getElementById('photo-analyzing').classList.remove('show');
-    alert('Configura la API Key nelle impostazioni per usare questa funzione.');return;
   }
   try{
     const raw = await callAI(`Analizza questa prescrizione odontotecnica ed estrai i dati. Rispondi SOLO con JSON valido senza markdown:
@@ -2389,9 +2378,6 @@ function stopDichVoice(){
 
 async function parseDichVoice(text){
   document.getElementById('dich-voice-status').textContent='🔍 L\'AI sta analizzando...';
-  if(!settings.apikey||!settings.apikey.startsWith('sk-')){
-    alert('Configura la API Key nelle impostazioni.');return;
-  }
   try{
     const raw = await callAI(`Estrai i dati da questo testo vocale per una dichiarazione di conformità MDR 2017/745. Rispondi SOLO con JSON valido senza markdown.
 Testo: "${text}"
@@ -2481,9 +2467,6 @@ function handleDichPhoto(e){
 async function analyzeDichPhoto(){
   document.getElementById('dich-photo-analyzing').classList.add('show');
   document.getElementById('dich-photo-result').classList.remove('show');
-  if(!settings.apikey||!settings.apikey.startsWith('sk-')){
-    document.getElementById('dich-photo-analyzing').classList.remove('show');
-    alert('Configura la API Key nelle impostazioni.');return;
   }
   try{
     const raw = await callAI(`Analizza questa prescrizione odontotecnica ed estrai i dati. Rispondi SOLO con JSON valido senza markdown.

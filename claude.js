@@ -7,7 +7,12 @@ export async function onRequestPost(context) {
   };
 
   try {
-    const { apiKey, messages, system } = await context.request.json();
+    const { messages, system } = await context.request.json();
+    const apiKey = context.env.ANTHROPIC_API_KEY;
+
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: 'API key non configurata sul server.' }), { status: 500, headers: corsHeaders });
+    }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
